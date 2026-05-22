@@ -1,0 +1,16 @@
+{
+  "name": "ccs-whatsapp-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp chatbot for Chandra Color Shoppee, powered by Claude (Twilio WhatsApp).",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
