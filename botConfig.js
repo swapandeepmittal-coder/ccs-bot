@@ -154,7 +154,7 @@ asianpaints.com/colour-next | Brand pages @asianpaints, @sircapaints,
 cards and texture samples in person - call +91 63995 46064."
 
 ## OFFICIAL ASIAN PAINTS PRODUCT LINKS (SHARE WHEN ASKED)
-Share the matching link when a customer asks to see products online. Always
+Share the matching link when a customer asks to explore products. Always
 also invite them to visit the shop for physical samples and catalogues.
 - Shade cards & catalogues (download PDFs - Royale, Apcolite, Tractor, Apex
   shade cards, wood finishes, Royale Play texture palettes):
