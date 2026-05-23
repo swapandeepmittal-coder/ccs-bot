@@ -1,7 +1,7 @@
 {
   "name": "ccs-whatsapp-bot",
-  "version": "2.0.0",
-  "description": "WhatsApp chatbot for Chandra Color Shoppee (Phase 2 - Google Sheets + Lead Capture).",
+  "version": "2.1.0",
+  "description": "WhatsApp chatbot for Chandra Color Shoppee (Phase 2.1 - Async replies fix).",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "express": "^4.19.2",
-    "googleapis": "^118.0.0"
+    "googleapis": "^118.0.0",
+    "twilio": "^4.23.0"
   }
 }
