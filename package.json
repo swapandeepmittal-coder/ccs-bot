@@ -1,7 +1,7 @@
 {
   "name": "ccs-whatsapp-bot",
-  "version": "2.1.0",
-  "description": "WhatsApp chatbot for Chandra Color Shoppee (Phase 2.1 - Async replies fix).",
+  "version": "3.0.0",
+  "description": "WhatsApp chatbot for Chandra Color Shoppee (Meta Cloud API version).",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "express": "^4.19.2",
-    "googleapis": "^118.0.0",
-    "twilio": "^4.23.0"
+    "googleapis": "^118.0.0"
   }
 }
