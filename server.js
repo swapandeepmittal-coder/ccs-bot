@@ -176,36 +176,53 @@ function detectCustomerType(conversationHistory, latestMessage) {
   return "retail";
 }
 
-// ---- Extract Lead Details ----
-function extractLeadDetails(conversationHistory) {
-  const allText = conversationHistory.map(m => m.content).join(" ");
-  let name = null, phone = null, requirement = null;
+// ---- Track which numbers we've already saved as leads (once per conversation) ----
+const savedLeads = new Set();
 
-  const nameMatch = allText.match(/(?:name is|i'm|my name|call me)\s+([A-Za-z]+)/i);
-  if (nameMatch) name = nameMatch[1];
+// ---- Extract a name ONLY if the customer clearly stated it ----
+function extractName(conversationHistory) {
+  for (const m of conversationHistory) {
+    if (m.role !== "user") continue;
+    // Only accept a clearly-introduced name, e.g. "my name is Raj", "I am Priya"
+    const match = m.content.match(/(?:my name is|name is|i am|i'm|this is|myself)\s+([A-Z][a-z]{1,19})/i);
+    if (match) {
+      const candidate = match[1].trim();
+      // Reject common false positives
+      const blacklist = ["interested", "looking", "thinking", "from", "here", "trying", "planning", "painting"];
+      if (!blacklist.includes(candidate.toLowerCase())) {
+        return candidate;
+      }
+    }
+  }
+  return "Not provided";
+}
 
-  const phoneMatch = allText.match(/(\+?91\s?)?([6-9]\d{9})\b/);
-  if (phoneMatch) phone = phoneMatch[2];
-
-  const reqMatch = allText.match(/(?:paint|room|project|wall|shade|colour|texture|wallpaper|waterproof|roof|leak|leakage|bathroom|kitchen|bedroom|living|home|apartment|house|office|commercial)\s+([^.,;!?\n]{10,60})/i);
-  if (reqMatch) requirement = reqMatch[1].trim();
-
-  return { name, phone, requirement };
+// ---- Format the customer's WhatsApp number nicely ----
+function formatPhone(waNumber) {
+  // Meta sends numbers like "917060046064" — keep digits only
+  const digits = String(waNumber).replace(/\D/g, "");
+  return digits || "Unknown";
 }
 
 // ---- Save Lead to Google Sheets ----
-async function saveLeadToSheets(userId, name, phone, customerType, requirement) {
+async function saveLeadToSheets(phone, name, customerType, requirement) {
   if (!sheetsClient || !GOOGLE_SHEET_ID) return;
   try {
-    const timestamp = new Date().toISOString();
-    const row = [name || "N/A", phone || userId || "N/A", customerType, requirement || "N/A", timestamp];
+    const timestamp = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+    const row = [
+      name || "Not provided",
+      phone || "Unknown",
+      customerType || "retail",
+      requirement || "General enquiry",
+      timestamp,
+    ];
     await sheetsClient.spreadsheets.values.append({
       spreadsheetId: GOOGLE_SHEET_ID,
       range: "Leads!A:E",
       valueInputOption: "USER_ENTERED",
       resource: { values: [row] },
     });
-    console.log(`✓ Lead saved: ${name || phone} (${customerType})`);
+    console.log(`✓ Lead saved: ${phone} | name: ${name} (${customerType})`);
   } catch (err) {
     console.error("Error saving lead to Sheets:", err.message);
   }
@@ -310,12 +327,18 @@ async function processMessage(fromNumber, incomingMessage) {
     addToHistory(fromNumber, "user", incomingMessage);
     addToHistory(fromNumber, "assistant", reply);
 
-    const conversationText = history.map(m => m.content).join(" ");
-    if (/phone|number|name|requirement|paint|colour|quote|quotation/i.test(conversationText)) {
-      const { name, phone, requirement } = extractLeadDetails(history);
-      if (phone || name) {
-        await saveLeadToSheets(fromNumber, name, phone, customerType, requirement);
-      }
+    // ---- Save lead (Option B: real WhatsApp number, once per conversation) ----
+    const phone = formatPhone(fromNumber);
+    if (!savedLeads.has(phone)) {
+      // The customer's FIRST message is the best summary of what they want
+      const firstUserMsg = history.find((m) => m.role === "user");
+      const requirement = firstUserMsg
+        ? firstUserMsg.content.slice(0, 80)
+        : incomingMessage.slice(0, 80);
+      const name = extractName(history);
+
+      await saveLeadToSheets(phone, name, customerType, requirement);
+      savedLeads.add(phone); // don't save this number again this run
     }
 
     await sendWhatsAppMessage(fromNumber, reply);
