@@ -365,7 +365,99 @@ async function sendWhatsAppMessage(toNumber, message) {
   }
 }
 
-// ---- Process an incoming message ----
+// ---- Send a PDF document via Meta WhatsApp API ----
+async function sendWhatsAppDocument(toNumber, pdfUrl, filename, caption) {
+  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) return;
+  try {
+    const url = `https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${WHATSAPP_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: toNumber,
+        type: "document",
+        document: {
+          link: pdfUrl,
+          filename: filename,
+          caption: caption || "",
+        },
+      }),
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("Error sending WhatsApp document:", response.status, errText);
+      return false;
+    }
+    console.log(`✓ PDF sent to ${toNumber}: ${filename}`);
+    return true;
+  } catch (err) {
+    console.error("Error sending WhatsApp document:", err.message);
+    return false;
+  }
+}
+
+// ---- Brochure catalogue (PDFs hosted on GitHub) ----
+const GH = "https://raw.githubusercontent.com/swapandeepmittal-coder/ccs-bot/main/";
+const BROCHURES = {
+  woodEmporio: {
+    url: GH + "WF-emporio-magazine.pdf",
+    filename: "Asian-Paints-Emporio-Wood-Finishes.pdf",
+    caption: "Asian Paints Emporio — Wood Coatings & Finishes 🪵",
+  },
+  woodInsignia: {
+    url: GH + "Insignia-Booklet_30.10.pdf",
+    filename: "Asian-Paints-Insignia-Wood-Finishes.pdf",
+    caption: "Asian Paints Insignia — Wood Finishes Collection 🪵",
+  },
+  designer: {
+    url: GH + "Designer-collection.pdf",
+    filename: "Royale-Play-Designer-Collection.pdf",
+    caption: "Royale Play Designer Collection — wall textures & finishes 🎨",
+  },
+  patterns: {
+    url: GH + "AP_RP_NewPattern_PrintShadeCard_LrV1.pdf",
+    filename: "Royale-Play-Texture-Patterns.pdf",
+    caption: "Royale Play — texture patterns shade card 🎨",
+  },
+  lithos: {
+    url: GH + "Final-Lithos-Brochure-HQP-Web.pdf",
+    filename: "Royale-Play-Lithos-Stone-Finishes.pdf",
+    caption: "Royale Play Lithos — natural stone-inspired finishes 🪨",
+  },
+};
+
+// Decide which brochure(s) the customer is asking for. Returns array of keys.
+function detectBrochureRequest(message) {
+  const text = (message || "").toLowerCase();
+
+  const wantsCatalogue = /catalog|catalogue|brochure|book|booklet|pdf|samples?|designs?|show me|send|magazine|shade card/i.test(text);
+  const mentionsWood = /wood|polish|furniture|emporio|insignia|veneer|melamyne|pu finish/i.test(text);
+  const mentionsTexture = /texture|royale play|archi concrete|calcecruda|designer collection|pattern|feature wall|stucco|marmorino|stellato/i.test(text);
+  const mentionsLithos = /lithos|stone finish/i.test(text);
+
+  const wanted = [];
+
+  // Wood takes priority — if they mention wood, send only wood brochures
+  if (mentionsWood) {
+    wanted.push("woodEmporio", "woodInsignia");
+    return wanted; // wood query — don't mix in texture PDFs
+  }
+
+  if (mentionsLithos) {
+    wanted.push("lithos");
+  }
+  if (mentionsTexture) {
+    wanted.push("designer", "patterns");
+  }
+
+  return [...new Set(wanted)];
+}
+
+
 async function processMessage(fromNumber, incomingMessage) {
   try {
     const history = getHistory(fromNumber);
@@ -415,6 +507,16 @@ async function processMessage(fromNumber, incomingMessage) {
     }
 
     await sendWhatsAppMessage(fromNumber, reply);
+
+    // ---- Send brochure PDF(s) if the customer asked about textures/wood/catalogues ----
+    const brochureKeys = detectBrochureRequest(incomingMessage);
+    for (const key of brochureKeys) {
+      const b = BROCHURES[key];
+      if (b && b.url) {
+        await sendWhatsAppDocument(fromNumber, b.url, b.filename, b.caption);
+      }
+    }
+
     console.log(`✓ Processed message (Type: ${customerType})`);
   } catch (err) {
     console.error("Failed to process message:", err.message);
