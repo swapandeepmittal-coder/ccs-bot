@@ -179,6 +179,53 @@ function detectCustomerType(conversationHistory, latestMessage) {
 // ---- Track which numbers we've already saved as leads (once per conversation) ----
 const savedLeads = new Set();
 
+// ---- Detect the actual PRODUCT requirement from the conversation ----
+function detectRequirement(conversationHistory) {
+  const text = conversationHistory
+    .filter((m) => m.role === "user")
+    .map((m) => m.content)
+    .join(" ")
+    .toLowerCase();
+
+  // Typo-tolerant "paint" matcher: matches paint, pianting, painnt, pinting, etc.
+  const paintWord = /p[ia]{1,3}n+t/i;
+
+  const interests = [];
+  if (/waterproof|water proof|leak|leakage|damp|seepage/i.test(text)) interests.push("Waterproofing");
+  if (/wallpaper|wall paper|nilaya/i.test(text)) interests.push("Wallpaper");
+  if (/texture|royale play|stucco/i.test(text)) interests.push("Wall textures");
+  if (/wood|polish|furniture|sirca|ica|duco|coating/i.test(text)) interests.push("Wood coatings");
+  if (/full house|whole house|entire home|complete home|house\s*p[ia]{1,3}n+t|home\s*p[ia]{1,3}n+t|p[ia]{1,3}n+t.*service|beautiful home|p[ia]{1,3}n+ter/i.test(text)) interests.push("Full house painting service");
+  if (/exterior|outside wall|outer wall|apex/i.test(text)) interests.push("Exterior painting");
+  if (/interior|inside|room p[ia]{1,3}n+t|wall p[ia]{1,3}n+t/i.test(text)) interests.push("Interior painting");
+  if (/colour|color|shade/i.test(text)) interests.push("Colour consultation");
+  if (/quotation|quote|estimate|price|cost|rate|budget/i.test(text)) interests.push("Price/quotation enquiry");
+  if (/bulk|contractor|architec|project|commercial|multiple/i.test(text)) interests.push("Bulk/project/architect enquiry");
+
+  const rooms = [];
+  if (/bedroom/i.test(text)) rooms.push("bedroom");
+  if (/living room|hall|drawing room/i.test(text)) rooms.push("living room");
+  if (/kitchen/i.test(text)) rooms.push("kitchen");
+  if (/bathroom|toilet/i.test(text)) rooms.push("bathroom");
+  if (/kids|children|nursery/i.test(text)) rooms.push("kids room");
+  if (/office/i.test(text)) rooms.push("office");
+
+  let requirement = "";
+  if (interests.length > 0) {
+    // remove duplicate-ish overlaps
+    const unique = [...new Set(interests)];
+    requirement = unique.join(", ");
+    if (rooms.length > 0) requirement += " (" + rooms.join(", ") + ")";
+  } else if (rooms.length > 0) {
+    requirement = "Painting — " + rooms.join(", ");
+  } else if (paintWord.test(text) || /\bhouse\b|\bhome\b|\bwall\b/i.test(text)) {
+    requirement = "General paint enquiry";
+  } else {
+    requirement = "General enquiry — follow up needed";
+  }
+  return requirement;
+}
+
 // ---- Extract a name ONLY if the customer clearly stated it ----
 function extractName(conversationHistory) {
   for (const m of conversationHistory) {
@@ -327,18 +374,23 @@ async function processMessage(fromNumber, incomingMessage) {
     addToHistory(fromNumber, "user", incomingMessage);
     addToHistory(fromNumber, "assistant", reply);
 
-    // ---- Save lead (Option B: real WhatsApp number, once per conversation) ----
+    // ---- Save lead (Option B: real WhatsApp number, product-based requirement) ----
     const phone = formatPhone(fromNumber);
     if (!savedLeads.has(phone)) {
-      // The customer's FIRST message is the best summary of what they want
-      const firstUserMsg = history.find((m) => m.role === "user");
-      const requirement = firstUserMsg
-        ? firstUserMsg.content.slice(0, 80)
-        : incomingMessage.slice(0, 80);
+      // Look at the FULL conversation so far to detect what they actually want
+      const requirement = detectRequirement(history);
       const name = extractName(history);
+      const userMsgCount = history.filter((m) => m.role === "user").length;
 
-      await saveLeadToSheets(phone, name, customerType, requirement);
-      savedLeads.add(phone); // don't save this number again this run
+      // Save once we know the actual product interest,
+      // OR after 3 messages so we never lose a lead
+      const haveRealRequirement =
+        requirement !== "General enquiry — follow up needed";
+
+      if (haveRealRequirement || userMsgCount >= 3) {
+        await saveLeadToSheets(phone, name, customerType, requirement);
+        savedLeads.add(phone); // don't save this number again this run
+      }
     }
 
     await sendWhatsAppMessage(fromNumber, reply);
