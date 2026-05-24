@@ -291,11 +291,16 @@ async function processMessage(fromNumber, incomingMessage) {
     let messageForClaude = incomingMessage;
     if (relevantShades.length > 0) {
       const shadeList = relevantShades
-        .map((s) => `${s.name} (code ${s.code}, ${s.hex}, ${s.family}, ${s.temperature} tone, ${s.tonality})`)
+        .map((s) => `${s.name} (code ${s.code}, hex ${s.hex}, ${s.family}, ${s.temperature} tone, ${s.tonality})`)
         .join("; ");
       messageForClaude =
         incomingMessage +
-        `\n\n[Asian Paints shades you may reference for this query — only mention these if relevant: ${shadeList}]`;
+        `\n\n=== ASIAN PAINTS SHADE DATABASE RESULTS ===\n` +
+        `The shop's official shade database returned these REAL Asian Paints shades for this query. ` +
+        `You MUST use these actual shade names and codes in your reply (do not invent other shades). ` +
+        `Recommend 3-5 of them that best fit what the customer asked, mention the shade name and code, ` +
+        `and briefly say why each suits their room:\n${shadeList}\n` +
+        `=== END SHADE DATABASE RESULTS ===`;
       console.log(`  ↳ ${relevantShades.length} shades matched for this query`);
     }
 
