@@ -181,13 +181,33 @@ const savedLeads = new Set();
 
 // ---- Detect the actual PRODUCT requirement from the conversation ----
 function detectRequirement(conversationHistory) {
-  const text = conversationHistory
+  const userMsgs = conversationHistory
     .filter((m) => m.role === "user")
-    .map((m) => m.content)
-    .join(" ")
-    .toLowerCase();
+    .map((m) => m.content);
+  const text = userMsgs.join(" ").toLowerCase();
 
-  // Typo-tolerant "paint" matcher: matches paint, pianting, painnt, pinting, etc.
+  // Menu number mapping (customer picked from the service menu)
+  const menuMap = {
+    "1": "Wall paint & colour selection",
+    "2": "Colour / shade suggestions",
+    "3": "Waterproofing (leakage / damp)",
+    "4": "Wall textures",
+    "5": "Wallpapers",
+    "6": "Wood polish & coatings",
+    "7": "Full house painting service",
+    "8": "Price / quotation enquiry",
+    "9": "Shop visit / location enquiry",
+  };
+  // Check if any user message is just a single menu digit
+  const menuPicks = [];
+  for (const msg of userMsgs) {
+    const trimmed = msg.trim();
+    if (/^[1-9]$/.test(trimmed) && menuMap[trimmed]) {
+      menuPicks.push(menuMap[trimmed]);
+    }
+  }
+
+  // Typo-tolerant "paint" matcher
   const paintWord = /p[ia]{1,3}n+t/i;
 
   const interests = [];
@@ -210,11 +230,12 @@ function detectRequirement(conversationHistory) {
   if (/kids|children|nursery/i.test(text)) rooms.push("kids room");
   if (/office/i.test(text)) rooms.push("office");
 
+  // Combine menu picks + detected interests
+  const allInterests = [...new Set([...menuPicks, ...interests])];
+
   let requirement = "";
-  if (interests.length > 0) {
-    // remove duplicate-ish overlaps
-    const unique = [...new Set(interests)];
-    requirement = unique.join(", ");
+  if (allInterests.length > 0) {
+    requirement = allInterests.join(", ");
     if (rooms.length > 0) requirement += " (" + rooms.join(", ") + ")";
   } else if (rooms.length > 0) {
     requirement = "Painting — " + rooms.join(", ");
