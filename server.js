@@ -23,10 +23,96 @@
  */
 
 const express = require("express");
+const fs = require("fs");
 const { SYSTEM_PROMPT } = require("./botConfig");
 const { google } = require("googleapis");
 
 const app = express();
+
+// ============================================================
+//  ASIAN PAINTS SHADE DATABASE (2199 shades)
+// ============================================================
+let shades = [];
+try {
+  const csv = fs.readFileSync("./asian_paints_shades.csv", "utf8");
+  const lines = csv.split("\n").slice(1); // skip header row
+  shades = lines
+    .filter((l) => l.trim())
+    .map((line) => {
+      const [name, code, hex, family, temperature, tonality] = line.split(",");
+      return {
+        name: (name || "").trim(),
+        code: (code || "").trim(),
+        hex: (hex || "").trim(),
+        family: (family || "").trim(),
+        temperature: (temperature || "").trim(),
+        tonality: (tonality || "").trim(),
+      };
+    });
+  console.log(`✓ Loaded ${shades.length} Asian Paints shades`);
+} catch (err) {
+  console.warn("⚠ Could not load shades CSV:", err.message);
+}
+
+// Find shades relevant to a customer's message (keeps prompt small & fast)
+function findRelevantShades(message) {
+  if (!shades.length) return [];
+  const text = (message || "").toLowerCase();
+  let matches = [];
+
+  // 1. Match by shade code (e.g. "9436")
+  const codeMatch = text.match(/\b\d{3,4}\b/g);
+  if (codeMatch) {
+    for (const code of codeMatch) {
+      matches.push(...shades.filter((s) => s.code === code));
+    }
+  }
+
+  // 2. Match by exact shade name appearing in the message
+  for (const s of shades) {
+    if (s.name && s.name.length > 3 && text.includes(s.name)) {
+      matches.push(s);
+    }
+  }
+
+  // 3. Match by colour family + optional tonality/temperature
+  const familyMap = {
+    green: "greens", greens: "greens",
+    brown: "browns", browns: "browns",
+    purple: "purples", purples: "purples", violet: "purples",
+    pink: "pinks", pinks: "pinks",
+    grey: "greys", greys: "greys", gray: "greys", grays: "greys",
+    blue: "blues", blues: "blues",
+    orange: "oranges", oranges: "oranges",
+    yellow: "yellows", yellows: "yellows",
+    "off white": "off whites", "off whites": "off whites",
+    white: "whites", whites: "whites",
+    red: "reds", reds: "reds",
+  };
+  for (const [word, family] of Object.entries(familyMap)) {
+    if (text.includes(word)) {
+      let famShades = shades.filter((s) => s.family === family);
+      // refine by tonality if mentioned
+      if (text.includes("light")) famShades = famShades.filter((s) => s.tonality === "light");
+      else if (text.includes("dark") || text.includes("deep")) famShades = famShades.filter((s) => s.tonality === "dark");
+      else if (text.includes("medium")) famShades = famShades.filter((s) => s.tonality === "medium");
+      // refine by temperature if mentioned
+      if (text.includes("warm")) famShades = famShades.filter((s) => s.temperature === "warm");
+      else if (text.includes("cool")) famShades = famShades.filter((s) => s.temperature === "cool");
+      matches.push(...famShades.slice(0, 12));
+    }
+  }
+
+  // Deduplicate by code
+  const seen = new Set();
+  matches = matches.filter((s) => {
+    if (!s.code || seen.has(s.code)) return false;
+    seen.add(s.code);
+    return true;
+  });
+
+  return matches.slice(0, 15); // cap to keep the prompt small
+}
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -200,8 +286,22 @@ async function processMessage(fromNumber, incomingMessage) {
     const history = getHistory(fromNumber);
     const customerType = detectCustomerType(history, incomingMessage);
 
-    const reply = await askClaude(fromNumber, incomingMessage);
+    // Look up relevant Asian Paints shades and add them as context
+    const relevantShades = findRelevantShades(incomingMessage);
+    let messageForClaude = incomingMessage;
+    if (relevantShades.length > 0) {
+      const shadeList = relevantShades
+        .map((s) => `${s.name} (code ${s.code}, ${s.hex}, ${s.family}, ${s.temperature} tone, ${s.tonality})`)
+        .join("; ");
+      messageForClaude =
+        incomingMessage +
+        `\n\n[Asian Paints shades you may reference for this query — only mention these if relevant: ${shadeList}]`;
+      console.log(`  ↳ ${relevantShades.length} shades matched for this query`);
+    }
 
+    const reply = await askClaude(fromNumber, messageForClaude);
+
+    // Store the ORIGINAL message in history (not the augmented one)
     addToHistory(fromNumber, "user", incomingMessage);
     addToHistory(fromNumber, "assistant", reply);
 
