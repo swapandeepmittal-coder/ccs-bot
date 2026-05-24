@@ -1,22 +1,21 @@
 /**
  * ============================================================
- *  CHANDRA COLOR SHOPPEE - WHATSAPP BOT SERVER - PHASE 2.1
+ *  CHANDRA COLOR SHOPPEE - WHATSAPP BOT SERVER - META v3.0
  * ============================================================
- *  IMPORTANT FIX: Asynchronous replies
- *  - The webhook now responds to Twilio INSTANTLY
- *  - The bot's reply is sent separately via Twilio's API
- *  - This fixes the "bot not replying" timeout problem on
- *    Render's free tier (slow cold starts)
+ *  This version uses META's WhatsApp Cloud API (not Twilio).
  *
  *  REQUIRED ENVIRONMENT VARIABLES (set in Render):
- *  - ANTHROPIC_API_KEY      (your Claude API key)
- *  - TWILIO_ACCOUNT_SID     (from Twilio console)
- *  - TWILIO_AUTH_TOKEN      (from Twilio console)
- *  - TWILIO_WHATSAPP_NUMBER (e.g. whatsapp:+14155238886)
+ *  - ANTHROPIC_API_KEY          (your Claude API key)
+ *  - WHATSAPP_TOKEN             (Meta access token)
+ *  - WHATSAPP_PHONE_NUMBER_ID   (Meta phone number ID)
+ *  - WHATSAPP_VERIFY_TOKEN      (a password you invent yourself)
  *
  *  OPTIONAL (for Google Sheets lead capture):
  *  - GOOGLE_SHEET_ID
  *  - GOOGLE_SHEETS_KEY
+ *
+ *  WEBHOOK URL (set this in Meta):
+ *  - https://your-app.onrender.com/webhook
  *
  *  You do NOT normally edit this file.
  *  To add products/offers/FAQs, edit botConfig.js instead.
@@ -26,17 +25,16 @@
 const express = require("express");
 const { SYSTEM_PROMPT } = require("./botConfig");
 const { google } = require("googleapis");
-const twilio = require("twilio");
 
 const app = express();
-app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
 // ---- Settings (from environment variables) ----
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
+const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+const WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
 const GOOGLE_SHEETS_KEY = process.env.GOOGLE_SHEETS_KEY;
 const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const PORT = process.env.PORT || 3000;
@@ -44,23 +42,10 @@ const MODEL = "claude-haiku-4-5-20251001";
 const MAX_TOKENS = 600;
 const HISTORY_LIMIT = 15;
 
-if (!ANTHROPIC_API_KEY) {
-  console.error("ERROR: ANTHROPIC_API_KEY not set.");
-}
-
-// ---- Twilio Client Setup ----
-let twilioClient = null;
-try {
-  if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
-    twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-    console.log("✓ Twilio client initialized (async replies enabled)");
-  } else {
-    console.warn("⚠ Twilio credentials missing — falling back to TwiML mode");
-    console.warn("  Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER");
-  }
-} catch (err) {
-  console.error("Twilio setup error:", err.message);
-}
+if (!ANTHROPIC_API_KEY) console.error("ERROR: ANTHROPIC_API_KEY not set.");
+if (!WHATSAPP_TOKEN) console.error("ERROR: WHATSAPP_TOKEN not set.");
+if (!WHATSAPP_PHONE_NUMBER_ID) console.error("ERROR: WHATSAPP_PHONE_NUMBER_ID not set.");
+if (!WHATSAPP_VERIFY_TOKEN) console.error("ERROR: WHATSAPP_VERIFY_TOKEN not set.");
 
 // ---- Google Sheets Setup ----
 let sheetsClient = null;
@@ -74,7 +59,7 @@ try {
     sheetsClient = google.sheets({ version: "v4", auth });
     console.log("✓ Google Sheets client initialized");
   } else {
-    console.warn("⚠ Google Sheets not configured (GOOGLE_SHEETS_KEY or GOOGLE_SHEET_ID missing)");
+    console.warn("⚠ Google Sheets not configured");
   }
 } catch (err) {
   console.error("Google Sheets setup error:", err.message);
@@ -82,6 +67,8 @@ try {
 
 // ---- In-memory conversation storage ----
 const conversations = new Map();
+// Track processed message IDs to avoid duplicate handling
+const processedMessages = new Set();
 
 function getHistory(userId) {
   if (!conversations.has(userId)) conversations.set(userId, []);
@@ -94,44 +81,18 @@ function addToHistory(userId, role, text) {
   while (history.length > HISTORY_LIMIT) history.shift();
 }
 
-// ---- Escape XML for TwiML ----
-function escapeXml(text) {
-  return String(text)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
-function twimlReply(message) {
-  return `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escapeXml(message)}</Message></Response>`;
-}
-
-function emptyTwiml() {
-  return `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`;
-}
-
 // ---- Customer Type Detection ----
 function detectCustomerType(conversationHistory, latestMessage) {
   const text = (latestMessage + " " + conversationHistory.map(m => m.content).join(" ")).toLowerCase();
-
-  if (/architect|designer|contractor|builder|project|bulk order|multiple sites|construction|commercial|site visit/i.test(text)) {
-    return "architect";
-  }
-  if (/luxury|premium|feature wall|designer|high.?end|expensive|royale|statement|exclusive/i.test(text)) {
-    return "premium";
-  }
-  if (/again|last time|previous|repeat|refill|another room/i.test(text)) {
-    return "repeat";
-  }
+  if (/architect|designer|contractor|builder|project|bulk order|multiple sites|construction|commercial|site visit/i.test(text)) return "architect";
+  if (/luxury|premium|feature wall|designer|high.?end|expensive|royale|statement|exclusive/i.test(text)) return "premium";
+  if (/again|last time|previous|repeat|refill|another room/i.test(text)) return "repeat";
   return "retail";
 }
 
-// ---- Extract Lead Details from Conversation ----
+// ---- Extract Lead Details ----
 function extractLeadDetails(conversationHistory) {
   const allText = conversationHistory.map(m => m.content).join(" ");
-
   let name = null, phone = null, requirement = null;
 
   const nameMatch = allText.match(/(?:name is|i'm|my name|call me)\s+([A-Za-z]+)/i);
@@ -149,18 +110,15 @@ function extractLeadDetails(conversationHistory) {
 // ---- Save Lead to Google Sheets ----
 async function saveLeadToSheets(userId, name, phone, customerType, requirement) {
   if (!sheetsClient || !GOOGLE_SHEET_ID) return;
-
   try {
     const timestamp = new Date().toISOString();
     const row = [name || "N/A", phone || userId || "N/A", customerType, requirement || "N/A", timestamp];
-
     await sheetsClient.spreadsheets.values.append({
       spreadsheetId: GOOGLE_SHEET_ID,
       range: "Leads!A:E",
       valueInputOption: "USER_ENTERED",
       resource: { values: [row] },
     });
-
     console.log(`✓ Lead saved: ${name || phone} (${customerType})`);
   } catch (err) {
     console.error("Error saving lead to Sheets:", err.message);
@@ -203,25 +161,40 @@ async function askClaude(userId, userMessage) {
   return reply || "Sorry, I couldn't generate a reply. Please call +91 63995 46064.";
 }
 
-// ---- Send WhatsApp message via Twilio API ----
+// ---- Send WhatsApp message via Meta Graph API ----
 async function sendWhatsAppMessage(toNumber, message) {
-  if (!twilioClient || !TWILIO_WHATSAPP_NUMBER) {
-    console.error("Cannot send message: Twilio not configured");
+  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
+    console.error("Cannot send message: Meta WhatsApp not configured");
     return;
   }
   try {
-    await twilioClient.messages.create({
-      from: TWILIO_WHATSAPP_NUMBER,
-      to: toNumber,
-      body: message,
+    const url = `https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${WHATSAPP_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: toNumber,
+        type: "text",
+        text: { body: message },
+      }),
     });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("Error sending WhatsApp message:", response.status, errText);
+      return;
+    }
     console.log(`✓ WhatsApp reply delivered to ${toNumber}`);
   } catch (err) {
     console.error("Error sending WhatsApp message:", err.message);
   }
 }
 
-// ---- Process a message (runs after webhook is acknowledged) ----
+// ---- Process an incoming message ----
 async function processMessage(fromNumber, incomingMessage) {
   try {
     const history = getHistory(fromNumber);
@@ -232,7 +205,6 @@ async function processMessage(fromNumber, incomingMessage) {
     addToHistory(fromNumber, "user", incomingMessage);
     addToHistory(fromNumber, "assistant", reply);
 
-    // Save lead if interest detected
     const conversationText = history.map(m => m.content).join(" ");
     if (/phone|number|name|requirement|paint|colour|quote|quotation/i.test(conversationText)) {
       const { name, phone, requirement } = extractLeadDetails(history);
@@ -241,7 +213,6 @@ async function processMessage(fromNumber, incomingMessage) {
       }
     }
 
-    // Send the reply via Twilio API
     await sendWhatsAppMessage(fromNumber, reply);
     console.log(`✓ Processed message (Type: ${customerType})`);
   } catch (err) {
@@ -253,51 +224,88 @@ async function processMessage(fromNumber, incomingMessage) {
   }
 }
 
-// ---- Twilio WhatsApp Webhook ----
-app.post("/whatsapp", async (req, res) => {
-  const incomingMessage = (req.body.Body || "").trim();
-  const fromNumber = req.body.From || "unknown";
+// ============================================================
+//  WEBHOOK - GET (verification by Meta)
+// ============================================================
+app.get("/webhook", (req, res) => {
+  const mode = req.query["hub.mode"];
+  const token = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
 
-  console.log(`📱 Message from ${fromNumber}: ${incomingMessage}`);
+  if (mode === "subscribe" && token === WHATSAPP_VERIFY_TOKEN) {
+    console.log("✓ Webhook verified by Meta");
+    return res.status(200).send(challenge);
+  }
+  console.warn("✗ Webhook verification failed (token mismatch)");
+  return res.sendStatus(403);
+});
 
-  // STEP 1: Acknowledge Twilio INSTANTLY (this fixes the timeout problem)
-  res.set("Content-Type", "text/xml");
+// ============================================================
+//  WEBHOOK - POST (incoming messages from Meta)
+// ============================================================
+app.post("/webhook", (req, res) => {
+  // Acknowledge to Meta immediately
+  res.sendStatus(200);
 
-  if (twilioClient && TWILIO_WHATSAPP_NUMBER) {
-    // Async mode: send empty response now, deliver reply via API later
-    res.send(emptyTwiml());
+  try {
+    const body = req.body;
+    if (!body.object) return;
 
-    // STEP 2: Process the message AFTER responding (no timeout pressure)
-    if (incomingMessage) {
-      processMessage(fromNumber, incomingMessage);
+    const entry = (body.entry || [])[0];
+    if (!entry) return;
+    const change = (entry.changes || [])[0];
+    if (!change || !change.value) return;
+
+    const value = change.value;
+    const messages = value.messages;
+    if (!messages || messages.length === 0) return; // could be a status update
+
+    const msg = messages[0];
+
+    // Avoid processing the same message twice
+    if (msg.id) {
+      if (processedMessages.has(msg.id)) return;
+      processedMessages.add(msg.id);
+      if (processedMessages.size > 1000) {
+        // keep the set from growing forever
+        processedMessages.clear();
+      }
     }
-  } else {
-    // Fallback mode (TwiML): only used if Twilio credentials are missing
-    if (!incomingMessage) {
-      return res.send(twimlReply("Namaste! I'm CCS Rang Sahayak. How can I help you?"));
+
+    const fromNumber = msg.from; // customer's WhatsApp number
+    let incomingText = "";
+
+    if (msg.type === "text" && msg.text) {
+      incomingText = (msg.text.body || "").trim();
+    } else {
+      // Non-text message (image, audio, etc.)
+      incomingText = "";
     }
-    try {
-      const reply = await askClaude(fromNumber, incomingMessage);
-      addToHistory(fromNumber, "user", incomingMessage);
-      addToHistory(fromNumber, "assistant", reply);
-      return res.send(twimlReply(reply));
-    } catch (err) {
-      console.error("Failed to handle message:", err.message);
-      return res.send(twimlReply(
-        "Sorry, our assistant is temporarily busy. Please call +91 63995 46064."
-      ));
+
+    console.log(`📱 Message from ${fromNumber}: ${incomingText || "[non-text message]"}`);
+
+    if (incomingText) {
+      processMessage(fromNumber, incomingText);
+    } else {
+      sendWhatsAppMessage(
+        fromNumber,
+        "Namaste! I'm CCS Rang Sahayak. Please send a text message and I'll help you with paints, colours, and more. Or call +91 63995 46064."
+      );
     }
+  } catch (err) {
+    console.error("Webhook processing error:", err.message);
   }
 });
 
 // ---- Health Check ----
 app.get("/", (req, res) => {
-  res.send("Chandra Color Shoppee WhatsApp bot (Phase 2.1) is running.");
+  res.send("Chandra Color Shoppee WhatsApp bot (Meta v3.0) is running.");
 });
 
 app.listen(PORT, () => {
-  console.log(`\n✓ CCS WhatsApp bot listening on port ${PORT}`);
+  console.log(`\n✓ CCS WhatsApp bot (META) listening on port ${PORT}`);
   console.log(`✓ Model: ${MODEL}`);
-  console.log(`✓ Reply mode: ${twilioClient ? "ASYNC (via Twilio API)" : "TwiML fallback"}`);
+  console.log(`✓ WhatsApp: ${WHATSAPP_TOKEN && WHATSAPP_PHONE_NUMBER_ID ? "configured" : "NOT configured"}`);
+  console.log(`✓ Webhook verify token: ${WHATSAPP_VERIFY_TOKEN ? "set" : "NOT set"}`);
   console.log(`✓ Google Sheets: ${sheetsClient ? "configured" : "not configured"}\n`);
 });
