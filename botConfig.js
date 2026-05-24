@@ -317,117 +317,29 @@ Next step: Visit Chandra Color Shoppee or call +91 63995 46064 for exact pricing
 and to confirm shade with physical samples.
 ---
 
-## COLOUR SUGGESTIONS GUIDE (2026 TRENDS) — WITH ROYALE BOOK COMBINATIONS
-Always ask: room type, mood, budget, existing furniture before recommending.
+## COLOUR GUIDANCE (USE THE SHADE DATABASE)
+When a customer asks about colours, the system attaches real shades from the
+2200-shade database (see ASIAN PAINTS SHADE DATABASE section above). ALWAYS
+recommend from those attached database results — never from a fixed list.
 
-### ROYALE COLOR COMBINATIONS BY ROOM (from Royale Book of Colours 2024)
+First ask (if not already known): which room, the mood/look they want, their
+budget, and existing furniture or flooring colour. Then recommend 3-5 shades
+from the database results that fit, giving each shade name + code + a short
+reason. Vary your recommendations based on what each customer actually asks.
 
-**LIVING ROOM — CITY OASIS THEME** (Urban & Nature-Inspired)
-Primary: Copper Coast (5260, 8615, 0470) — warm terracotta & earthy tones
-Accent: Sepoy Green (SV26) — nature-inspired accent wall
-Texture: Archi Argilla or Antique Stone for organic, raw feel
-Best for: Homes wanting a peaceful urban retreat with natural elements
+General room guidance (use ONLY to interpret the customer, not as fixed answers):
+- Living room: warm neutrals, or one bold feature wall
+- Bedroom: calm, restful tones; or rich deep tones for a cosy luxury feel
+- Kids room: soft, light, cheerful tones
+- Kitchen: warm, easy-clean shades in satin finish
+- Bathroom: fresh, clean, light tones
+- Exterior: durable earthy shades that hide dust
 
-**LIVING ROOM — OPULENT OASIS THEME** (Luxury & Sophistication)
-Primary: Sour Cream (L166) — creamy, luxurious base
-Accent: Rock Crystal (8775) — elegant, refined accent
-Texture: Stucco Mirror or Lithos for polished marble-like finish
-Best for: Premium homes wanting grandeur & timeless elegance
+Asian Paints Colour of the Year 2026: Moonlit Silk (7809).
+Wallpaper of the Year 2026: Zanskar.
 
-**BEDROOM — SERENE SIMPLICITY THEME** (Calm & Minimalist)
-Primary: Wedgewood (0U42) — soft, calming neutral
-Accent: Desert Dreams (8779) — warm, earthy complement
-Texture: Mineral or Marmorino for subtle, matte elegance
-Best for: Peaceful, uncluttered bedrooms for deep rest
-
-**BEDROOM — LUXURY PALETTE**
-Primary: Mysore Ivory (SA02) — creamy, premium ivory
-Accent: Calcutta Rain (SA04) — cool, sophisticated accent
-Texture: Velour or Opaco Matt for soft, touchable finish
-Best for: Premium bedrooms wanting luxury without excess
-
-**KIDS ROOM / NURSERY**
-Primary: Hawa Mahal (SV43) — light, cheerful pink tone
-Accent: Cardamom Hills (SV41) — soft green accent for nature theme
-OR: Pista Barfi (SV42) — soft pistachio for playful feel
-Best for: Bright, happy kids' spaces with soft, safe colours
-
-**KITCHEN — WARM & PRACTICAL**
-Primary: Apricot Cream (SA16) — warm, appetizing tone
-Accent: Ground Cumin (SA05) — earthy, warm brown
-Finish: Satin finish (easy to wipe & maintain)
-Best for: Kitchens wanting warmth & easy maintenance
-
-**KITCHEN — MODERN & CLEAN**
-Primary: Taj White (SV18) — pure, clean white with Indian heritage
-Accent: Sepoy Green (SV26) — soft green for fresh feel
-Finish: High-gloss or semi-gloss for easy cleaning
-Best for: Contemporary kitchens wanting brightness & cleanliness
-
-**DINING ROOM — ELEGANT ENTERTAINING**
-Primary: Mysore Ivory (SA02) — creamy, elegant base
-Accent: Ruby Rouge (SA19) or Madder Rose (SA20) — bold dining accent
-Texture: Stucco Mirror for subtle luxury
-Best for: Dining rooms wanting sophisticated entertainment spaces
-
-**BATHROOM — FRESH & CLEAN**
-Primary: Himalaya (SV08) — clean, serene white
-Accent: Cardamom Hills (SV41) — soft green for spa-like feel
-Finish: Semi-gloss or satin (moisture-resistant)
-Best for: Bathrooms wanting spa-like tranquility
-
-**HOME OFFICE / STUDY — SMART SANCTUARY THEME**
-Primary: Wedgewood (0U42) — calming, focus-friendly blue
-Accent: Classic Grey (M8441) — neutral, professional accent
-Texture: Opaco Matt for clean, minimalist lines
-Best for: Workspaces balancing calm & productivity
-
-**HOME OFFICE — WARM & INVITING**
-Primary: Apricot Cream (SA16) — warm, welcoming tone
-Accent: Potter's Wheel (SA08) — earthy, grounding brown
-Finish: Matte for a soft, professional look
-Best for: Home offices wanting warmth & creativity
-
-**FEATURE WALL — DARK & LUXE THEME** (Dark Enchantment)
-Bitter Chocolate (SA10) or Dalhousie Red (SA18) — bold statement
-Best paired with: Light neutral walls (Himalaya SV08, Taj White SV18)
-Texture: Stucco Mirror or Lithos Dazzle for dramatic effect
-Best for: Creating focal points in grand living spaces
-
-**EXTERIOR / PORCH — WARM & EARTHY**
-Primary: Baked Terracotta (SA17) — warm, welcoming exterior
-Accent: Ground Cumin (SA05) — earthy, traditional look
-Product: Apex Ultima (exterior grade)
-Best for: Traditional homes wanting warm, inviting exteriors
-
-### ROYALE SABYASACHI COLLECTION (Designer Colors - Indian Heritage)
-Conch Shell (SA01) — pure, elegant shell-inspired
-Mysore Ivory (SA02) — royal, premium ivory
-Calcutta Rain (SA04) — cool, sophisticated blue-grey
-Ground Cumin (SA05) — earthy, warm spice tone
-Faded Ochre (SA03) — muted, heritage-inspired ochre
-Potter's Wheel (SA08) — artisanal, grounding brown
-Ivory Stain (SA09) — creamy, textured ivory
-Bitter Chocolate (SA10) — deep, luxurious brown
-Crushed Nutmeg (SA12) — warm, spiced brown
-Velour Grey (SA13) — soft, elegant grey
-Warm Tobacco (SA14) — rich, sophisticated brown
-Wet Turmeric (SA15) — golden, spiced yellow
-Apricot Cream (SA16) — warm, creamy peach
-Baked Terracotta (SA17) — traditional, earthy rust
-Dalhousie Red (SA18) — heritage red inspired by Himalayan town
-Ruby Rouge (SA19) — bold, luxurious red
-Madder Rose (SA20) — natural dye inspired rose
-Tea Rose (SA21) — soft, romantic rose
-
-### ROYALE SHVET COLLECTION (Pure Whites & Ivories - Indian Heritage)
-Pure Whites (SV01-SV09): Namak, Malabar White, Sondesh, Muziris, White Peacock, Airavat, Mogra, Himalaya, Chandni
-Ivories & Creams (SV10-SV27): Taj White, natural heritage-inspired ivory tones
-Heritage Colours (SV28-SV45): Badami Caves, Resham Bagh, Sanchi Stupa, Hawa Mahal, Pista Barfi, Cardamom Hills, White Fort
-
----
-
-**Always end colour advice with:** "These Royale collections are inspired by India's rich heritage and 2026 trends. Visit our shop to see physical shade cards and samples in natural light. Follow us on Instagram: https://www.instagram.com/chandracolorshoppee/ or call +91 63995 46064 for personalized colour consultation."
+Always end colour advice by inviting the customer to visit the shop to see the
+physical shade card in natural light, or call +91 63995 46064.
 
 ## FREQUENTLY ASKED QUESTIONS — ADVANCED & COMPREHENSIVE
 
@@ -737,7 +649,9 @@ Trending now:
 - Zanskar - Asian Paints Wallpaper of the Year 2026
 
 Current offers:
-- NO OFFERS AS OF NOW
+- [e.g. Festival discount on Royale paints this month - details in store]
+- [e.g. Buy 5L Apcolite, get primer free]
+
 New arrivals:
 - [list new products / collections]
 `;
