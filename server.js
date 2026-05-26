@@ -370,10 +370,110 @@ async function sendWhatsAppMessage(toNumber, message) {
   }
 }
 
-// ---- Send a PDF document via Meta WhatsApp API ----
-async function sendWhatsAppDocument(toNumber, pdfUrl, filename, caption) {
-  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) return;
+// ---- Brochure catalogue ----
+// PDFs are downloaded from GitHub by the BOT itself, then uploaded directly to
+// Meta. Meta stores the file and returns a media ID. We send that media ID.
+// This avoids Meta failing to fetch external links (the GitHub-link problem).
+const GH = "https://raw.githubusercontent.com/swapandeepmittal-coder/ccs-bot/main/";
+const BROCHURES = {
+  woodEmporio: {
+    sourceUrl: GH + "WF-emporio-magazine.pdf",
+    filename: "Asian-Paints-Emporio-Wood-Finishes.pdf",
+    caption: "Asian Paints Emporio — Wood Coatings & Finishes",
+    mediaId: null,
+    uploadedAt: 0,
+  },
+  woodInsignia: {
+    sourceUrl: GH + "Insignia-Booklet_30.10.pdf",
+    filename: "Asian-Paints-Insignia-Wood-Finishes.pdf",
+    caption: "Asian Paints Insignia — Wood Finishes Collection",
+    mediaId: null,
+    uploadedAt: 0,
+  },
+  designer: {
+    sourceUrl: GH + "Designer-collection.pdf",
+    filename: "Royale-Play-Designer-Collection.pdf",
+    caption: "Royale Play Designer Collection — wall textures & finishes",
+    mediaId: null,
+    uploadedAt: 0,
+  },
+  patterns: {
+    sourceUrl: GH + "AP_RP_NewPattern_PrintShadeCard_LrV1.pdf",
+    filename: "Royale-Play-Texture-Patterns.pdf",
+    caption: "Royale Play — texture patterns shade card",
+    mediaId: null,
+    uploadedAt: 0,
+  },
+  lithos: {
+    sourceUrl: GH + "Final-Lithos-Brochure-HQP-Web.pdf",
+    filename: "Royale-Play-Lithos-Stone-Finishes.pdf",
+    caption: "Royale Play Lithos — natural stone-inspired finishes",
+    mediaId: null,
+    uploadedAt: 0,
+  },
+};
+
+// Meta media IDs are valid for ~30 days; we refresh after 20 days to be safe.
+const MEDIA_TTL_MS = 20 * 24 * 60 * 60 * 1000;
+
+// ---- Upload one PDF to Meta, return its media ID ----
+async function uploadPdfToMeta(brochure) {
+  // Re-use a recent media ID if we already have one
+  if (brochure.mediaId && Date.now() - brochure.uploadedAt < MEDIA_TTL_MS) {
+    return brochure.mediaId;
+  }
   try {
+    // 1. Bot downloads the PDF from GitHub (bot fetching its own files is reliable)
+    const pdfResp = await fetch(brochure.sourceUrl);
+    if (!pdfResp.ok) {
+      console.error(`✗ Could not download ${brochure.filename}: ${pdfResp.status}`);
+      return null;
+    }
+    const pdfBuffer = Buffer.from(await pdfResp.arrayBuffer());
+
+    // 2. Upload the file to Meta's media endpoint
+    const form = new FormData();
+    form.append("messaging_product", "whatsapp");
+    form.append(
+      "file",
+      new Blob([pdfBuffer], { type: "application/pdf" }),
+      brochure.filename
+    );
+
+    const uploadUrl = `https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_NUMBER_ID}/media`;
+    const uploadResp = await fetch(uploadUrl, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${WHATSAPP_TOKEN}` },
+      body: form,
+    });
+
+    if (!uploadResp.ok) {
+      const errText = await uploadResp.text();
+      console.error(`✗ Meta upload failed for ${brochure.filename}:`, uploadResp.status, errText);
+      return null;
+    }
+    const data = await uploadResp.json();
+    brochure.mediaId = data.id;
+    brochure.uploadedAt = Date.now();
+    console.log(`✓ Uploaded to Meta: ${brochure.filename} (media id ${data.id})`);
+    return data.id;
+  } catch (err) {
+    console.error(`✗ Error uploading ${brochure.filename}:`, err.message);
+    return null;
+  }
+}
+
+// ---- Send a PDF document via Meta (using an uploaded media ID) ----
+async function sendWhatsAppDocument(toNumber, brochure) {
+  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) return false;
+  try {
+    // Make sure the PDF is uploaded to Meta and we have a fresh media ID
+    const mediaId = await uploadPdfToMeta(brochure);
+    if (!mediaId) {
+      console.error(`✗ No media ID for ${brochure.filename} — cannot send`);
+      return false;
+    }
+
     const url = `https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
     const response = await fetch(url, {
       method: "POST",
@@ -386,54 +486,27 @@ async function sendWhatsAppDocument(toNumber, pdfUrl, filename, caption) {
         to: toNumber,
         type: "document",
         document: {
-          link: pdfUrl,
-          filename: filename,
-          caption: caption || "",
+          id: mediaId,
+          filename: brochure.filename,
+          caption: brochure.caption || "",
         },
       }),
     });
     if (!response.ok) {
       const errText = await response.text();
-      console.error("Error sending WhatsApp document:", response.status, errText);
+      console.error("✗ Error sending WhatsApp document:", response.status, errText);
+      // If the media ID went stale, clear it so the next try re-uploads
+      brochure.mediaId = null;
       return false;
     }
-    console.log(`✓ PDF sent to ${toNumber}: ${filename}`);
+    console.log(`✓ PDF sent to ${toNumber}: ${brochure.filename}`);
     return true;
   } catch (err) {
-    console.error("Error sending WhatsApp document:", err.message);
+    console.error("✗ Error sending WhatsApp document:", err.message);
     return false;
   }
 }
 
-// ---- Brochure catalogue (PDFs hosted on GitHub) ----
-const GH = "https://raw.githubusercontent.com/swapandeepmittal-coder/ccs-bot/main/";
-const BROCHURES = {
-  woodEmporio: {
-    url: GH + "WF-emporio-magazine.pdf",
-    filename: "Asian-Paints-Emporio-Wood-Finishes.pdf",
-    caption: "Asian Paints Emporio — Wood Coatings & Finishes 🪵",
-  },
-  woodInsignia: {
-    url: GH + "Insignia-Booklet_30.10.pdf",
-    filename: "Asian-Paints-Insignia-Wood-Finishes.pdf",
-    caption: "Asian Paints Insignia — Wood Finishes Collection 🪵",
-  },
-  designer: {
-    url: GH + "Designer-collection.pdf",
-    filename: "Royale-Play-Designer-Collection.pdf",
-    caption: "Royale Play Designer Collection — wall textures & finishes 🎨",
-  },
-  patterns: {
-    url: GH + "AP_RP_NewPattern_PrintShadeCard_LrV1.pdf",
-    filename: "Royale-Play-Texture-Patterns.pdf",
-    caption: "Royale Play — texture patterns shade card 🎨",
-  },
-  lithos: {
-    url: GH + "Final-Lithos-Brochure-HQP-Web.pdf",
-    filename: "Royale-Play-Lithos-Stone-Finishes.pdf",
-    caption: "Royale Play Lithos — natural stone-inspired finishes 🪨",
-  },
-};
 
 // Decide which brochure(s) the customer is asking for. Returns array of keys.
 function detectBrochureRequest(message) {
@@ -517,8 +590,8 @@ async function processMessage(fromNumber, incomingMessage) {
     const brochureKeys = detectBrochureRequest(incomingMessage);
     for (const key of brochureKeys) {
       const b = BROCHURES[key];
-      if (b && b.url) {
-        await sendWhatsAppDocument(fromNumber, b.url, b.filename, b.caption);
+      if (b) {
+        await sendWhatsAppDocument(fromNumber, b);
       }
     }
 
@@ -616,4 +689,17 @@ app.listen(PORT, () => {
   console.log(`✓ WhatsApp: ${WHATSAPP_TOKEN && WHATSAPP_PHONE_NUMBER_ID ? "configured" : "NOT configured"}`);
   console.log(`✓ Webhook verify token: ${WHATSAPP_VERIFY_TOKEN ? "set" : "NOT set"}`);
   console.log(`✓ Google Sheets: ${sheetsClient ? "configured" : "not configured"}\n`);
+
+  // Pre-upload all brochure PDFs to Meta in the background so the first
+  // customer who asks gets them instantly. Failures here are non-fatal —
+  // sendWhatsAppDocument will retry the upload on demand.
+  if (WHATSAPP_TOKEN && WHATSAPP_PHONE_NUMBER_ID) {
+    console.log("⏳ Pre-uploading brochure PDFs to Meta...");
+    (async () => {
+      for (const key of Object.keys(BROCHURES)) {
+        await uploadPdfToMeta(BROCHURES[key]);
+      }
+      console.log("✓ Brochure PDF pre-upload finished\n");
+    })();
+  }
 });
