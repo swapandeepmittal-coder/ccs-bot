@@ -373,45 +373,88 @@ async function sendWhatsAppMessage(toNumber, message) {
 // ---- Brochure catalogue ----
 // PDFs are downloaded from GitHub by the BOT itself, then uploaded directly to
 // Meta. Meta stores the file and returns a media ID. We send that media ID.
-// This avoids Meta failing to fetch external links (the GitHub-link problem).
+// Filenames have spaces, so each is URL-encoded when building the download link.
 const GH = "https://raw.githubusercontent.com/swapandeepmittal-coder/ccs-bot/main/";
+
+// Helper: build a brochure entry from the EXACT GitHub filename (spaces allowed)
+function brochure(githubFilename, caption) {
+  return {
+    sourceUrl: GH + encodeURIComponent(githubFilename),
+    filename: githubFilename.replace(/\s+/g, "-"), // clean name shown to customer
+    caption: caption,
+    mediaId: null,
+    uploadedAt: 0,
+  };
+}
+
 const BROCHURES = {
-  woodEmporio: {
-    sourceUrl: GH + "WF-emporio-magazine.pdf",
-    filename: "Asian-Paints-Emporio-Wood-Finishes.pdf",
-    caption: "Asian Paints Emporio — Wood Coatings & Finishes",
-    mediaId: null,
-    uploadedAt: 0,
-  },
-  woodInsignia: {
-    sourceUrl: GH + "Insignia-Booklet_30.10.pdf",
-    filename: "Asian-Paints-Insignia-Wood-Finishes.pdf",
-    caption: "Asian Paints Insignia — Wood Finishes Collection",
-    mediaId: null,
-    uploadedAt: 0,
-  },
-  designer: {
-    sourceUrl: GH + "Designer-collection.pdf",
-    filename: "Royale-Play-Designer-Collection.pdf",
-    caption: "Royale Play Designer Collection — wall textures & finishes",
-    mediaId: null,
-    uploadedAt: 0,
-  },
-  patterns: {
-    sourceUrl: GH + "AP_RP_NewPattern_PrintShadeCard_LrV1.pdf",
-    filename: "Royale-Play-Texture-Patterns.pdf",
-    caption: "Royale Play — texture patterns shade card",
-    mediaId: null,
-    uploadedAt: 0,
-  },
-  lithos: {
-    sourceUrl: GH + "Final-Lithos-Brochure-HQP-Web.pdf",
-    filename: "Royale-Play-Lithos-Stone-Finishes.pdf",
-    caption: "Royale Play Lithos — natural stone-inspired finishes",
-    mediaId: null,
-    uploadedAt: 0,
-  },
+  // ---- BUDGET TEXTURE ----
+  budgetTexture1: brochure(
+    "BUDGET TEXTURE INTERIOR  Asian Paints Royale PLAY Playlist.pdf",
+    "Royale Play Playlist — budget interior textures"),
+  budgetTexture2: brochure(
+    "BUDGET TEXTURE INTERIOR  PlayList 2 Compact version.pdf",
+    "Royale Play Playlist 2 — budget interior textures (compact)"),
+  budgetTexture3: brochure(
+    "BUDGET TEXTURE INTERIOR AP_RP_NewPattern_PrintShadeCard_LrV1.pdf",
+    "Royale Play — texture patterns shade card"),
+
+  // ---- EXTERIOR SHADE CARDS ----
+  exterior1: brochure(
+    "EXTERIOR SHADE CARD Apex-Ultima-Protek-Shade-Card.pdf",
+    "Apex Ultima Protek — exterior shade card"),
+  exterior2: brochure(
+    "EXTERIOR SHADE CARD ace-apex-shade-card (1).pdf",
+    "Ace & Apex — exterior shade card"),
+  exterior3: brochure(
+    "EXTERIOR SHADE CARD ace-apex-shade-card.pdf",
+    "Ace & Apex — exterior shade card"),
+  exterior4: brochure(
+    "EXTERIOR SHADE CARD apex-ultima-protek-duralife-shade-card.pdf",
+    "Apex Ultima Protek Duralife — exterior shade card"),
+
+  // ---- INTERIOR SHADE CARDS ----
+  interior1: brochure(
+    "INTERIOR SHADE CARD  Royale-Designer-Palette.pdf",
+    "Royale Designer Palette — interior shade card"),
+  interior2: brochure(
+    "INTERIOR SHADE CARD  Royale-Shade-Card-PDF-new.pdf",
+    "Royale — interior shade card"),
+  interior3: brochure(
+    "INTERIOR SHADE CARD  Tractor-emulsion-shadecard.pdf",
+    "Tractor Emulsion — interior shade card"),
+  interior4: brochure(
+    "INTERIOR SHADE CARD Apcolite-Shade-card-Digital.pdf",
+    "Apcolite — interior shade card"),
+
+  // ---- LUXURY TEXTURE ----
+  luxuryTexture1: brochure(
+    "LUXURY TEXTURE Designer-collection.pdf",
+    "Royale Play Designer Collection — luxury textures"),
+  luxuryTexture2: brochure(
+    "LUXURY TEXTURE Final-Lithos-Brochure-HQP-Web.pdf",
+    "Royale Play Lithos — luxury stone-inspired finishes"),
+  luxuryTexture3: brochure(
+    "LUXURY TEXTURE Infinitex_Patterns Book_0816_01_Pragati.pdf",
+    "Infinitex Patterns — luxury textures"),
+  luxuryTexture4: brochure(
+    "LUXURY TEXTURE luxindica-shade-booklet.pdf",
+    "Luxindica — luxury shade booklet"),
+
+  // ---- WOOD FINISHES ----
+  woodInsignia: brochure(
+    "Insignia-Booklet_30.10.pdf",
+    "Asian Paints Insignia — wood finishes"),
+  woodEmporio: brochure(
+    "WF-emporio-magazine.pdf",
+    "Asian Paints Emporio — wood coatings & finishes"),
+
+  // ---- FLOOR COATING ----
+  floorGuard: brochure(
+    "apexfloorguard-shadecard.pdf",
+    "Apex Floor Guard — floor coating shade card"),
 };
+
 
 // Meta media IDs are valid for ~30 days; we refresh after 20 days to be safe.
 const MEDIA_TTL_MS = 20 * 24 * 60 * 60 * 1000;
@@ -509,27 +552,56 @@ async function sendWhatsAppDocument(toNumber, brochure) {
 
 
 // Decide which brochure(s) the customer is asking for. Returns array of keys.
+// Sends at most a few PDFs per query so the customer's WhatsApp isn't flooded.
 function detectBrochureRequest(message) {
   const text = (message || "").toLowerCase();
 
-  const wantsCatalogue = /catalog|catalogue|brochure|book|booklet|pdf|samples?|designs?|show me|send|magazine|shade card/i.test(text);
-  const mentionsWood = /wood|polish|furniture|emporio|insignia|veneer|melamyne|pu finish/i.test(text);
-  const mentionsTexture = /texture|royale play|archi concrete|calcecruda|designer collection|pattern|feature wall|stucco|marmorino|stellato/i.test(text);
-  const mentionsLithos = /lithos|stone finish/i.test(text);
+  const wantsIt = /catalog|catalogue|brochure|book|booklet|pdf|samples?|designs?|show|send|magazine|shade card|shadecard|share/i.test(text);
+
+  const mentionsWood = /wood|polish|furniture|emporio|insignia|veneer|melamyne|pu finish|wood coat/i.test(text);
+  const mentionsExterior = /exterior|outside|outer wall|apex|ultima|ace |duralife|weatherproof/i.test(text);
+  const mentionsInterior = /interior shade|inside shade|royale shade|apcolite|tractor|interior colour|interior color/i.test(text);
+  const mentionsLuxuryTexture = /luxury texture|lithos|infinitex|luxindica|designer collection|premium texture/i.test(text);
+  const mentionsBudgetTexture = /budget texture|playlist|cheap texture|affordable texture/i.test(text);
+  const mentionsTexture = /texture|royale play|feature wall|designer wall|stucco|marmorino|stellato|archi concrete|calcecruda/i.test(text);
+  const mentionsFloor = /floor coat|floor guard|floor paint|floor shade/i.test(text);
+  const mentionsShadeCard = /shade card|shadecard|colour card|color card/i.test(text);
 
   const wanted = [];
 
-  // Wood takes priority — if they mention wood, send only wood brochures
+  // Wood — send the 2 wood brochures
   if (mentionsWood) {
-    wanted.push("woodEmporio", "woodInsignia");
-    return wanted; // wood query — don't mix in texture PDFs
+    return ["woodEmporio", "woodInsignia"];
   }
 
-  if (mentionsLithos) {
-    wanted.push("lithos");
+  // Floor coating
+  if (mentionsFloor) {
+    return ["floorGuard"];
   }
-  if (mentionsTexture) {
-    wanted.push("designer", "patterns");
+
+  // Exterior shade cards — send the 2 main ones (not all 4 duplicates)
+  if (mentionsExterior) {
+    wanted.push("exterior1", "exterior4");
+  }
+
+  // Interior shade cards — send the 2 main ones
+  if (mentionsInterior || (mentionsShadeCard && !mentionsExterior)) {
+    wanted.push("interior2", "interior1");
+  }
+
+  // Luxury textures
+  if (mentionsLuxuryTexture) {
+    wanted.push("luxuryTexture1", "luxuryTexture2");
+  }
+
+  // Budget textures
+  if (mentionsBudgetTexture) {
+    wanted.push("budgetTexture1", "budgetTexture3");
+  }
+
+  // Generic "texture" with no budget/luxury specified — send one of each
+  if (mentionsTexture && !mentionsLuxuryTexture && !mentionsBudgetTexture) {
+    wanted.push("luxuryTexture1", "budgetTexture1");
   }
 
   return [...new Set(wanted)];
