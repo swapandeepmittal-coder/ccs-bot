@@ -99,7 +99,12 @@ function findRelevantShades(message) {
       // refine by temperature if mentioned
       if (text.includes("warm")) famShades = famShades.filter((s) => s.temperature === "warm");
       else if (text.includes("cool")) famShades = famShades.filter((s) => s.temperature === "cool");
-      matches.push(...famShades.slice(0, 12));
+      // SHUFFLE so the bot suggests varied shades each time, not the same first 12
+      for (let i = famShades.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [famShades[i], famShades[j]] = [famShades[j], famShades[i]];
+      }
+      matches.push(...famShades.slice(0, 15));
     }
   }
 
@@ -111,7 +116,7 @@ function findRelevantShades(message) {
     return true;
   });
 
-  return matches.slice(0, 15); // cap to keep the prompt small
+  return matches.slice(0, 20); // cap to keep the prompt small
 }
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
