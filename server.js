@@ -337,6 +337,133 @@ async function askClaude(userId, userMessage) {
   return reply || "Sorry, I couldn't generate a reply. Please call +91 63995 46064.";
 }
 
+// ---- Download an image that a customer sent on WhatsApp ----
+// Meta gives us a media ID; we fetch the media URL, then download the bytes.
+async function downloadWhatsAppImage(mediaId) {
+  try {
+    // 1. Get the temporary media URL from Meta
+    const metaResp = await fetch(
+      `https://graph.facebook.com/v21.0/${mediaId}`,
+      { headers: { "Authorization": `Bearer ${WHATSAPP_TOKEN}` } }
+    );
+    if (!metaResp.ok) {
+      console.error("Could not get media URL:", metaResp.status);
+      return null;
+    }
+    const metaData = await metaResp.json();
+    if (!metaData.url) return null;
+
+    // 2. Download the actual image bytes (also needs the auth header)
+    const imgResp = await fetch(metaData.url, {
+      headers: { "Authorization": `Bearer ${WHATSAPP_TOKEN}` },
+    });
+    if (!imgResp.ok) {
+      console.error("Could not download image:", imgResp.status);
+      return null;
+    }
+    const buffer = Buffer.from(await imgResp.arrayBuffer());
+    const base64 = buffer.toString("base64");
+    const mediaType = metaData.mime_type || "image/jpeg";
+    return { base64, mediaType };
+  } catch (err) {
+    console.error("Error downloading WhatsApp image:", err.message);
+    return null;
+  }
+}
+
+// ---- Ask Claude to analyze a customer's photo (waterproofing / wall problem) ----
+async function analyzeImageWithClaude(userId, image, customerCaption) {
+  const history = getHistory(userId);
+
+  const visionInstruction =
+    "A customer of the paint shop has sent this photo. Look at it carefully. " +
+    "If it shows a wall problem (damp, seepage, water leakage, peeling paint, " +
+    "cracks, fungus/algae, efflorescence/white powder), then: (1) briefly say " +
+    "what the problem looks like, (2) suggest the likely cause, (3) recommend " +
+    "the right Asian Paints SmartCare waterproofing product for it, and (4) " +
+    "advise visiting Chandra Color Shoppee or calling +91 63995 46064 for an " +
+    "exact solution. If the photo is a room/wall they want painted, suggest " +
+    "suitable shades or finishes instead. If you cannot tell, ask one short " +
+    "question. Keep the reply short and WhatsApp-friendly. " +
+    (customerCaption ? `The customer also wrote: "${customerCaption}"` : "");
+
+  const messages = [
+    ...history,
+    {
+      role: "user",
+      content: [
+        {
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: image.mediaType,
+            data: image.base64,
+          },
+        },
+        { type: "text", text: visionInstruction },
+      ],
+    },
+  ];
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: MAX_TOKENS,
+      system: SYSTEM_PROMPT,
+      messages: messages,
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error("Anthropic vision API error:", response.status, errText);
+    throw new Error("Anthropic vision API error " + response.status);
+  }
+
+  const data = await response.json();
+  return (data.content || [])
+    .filter((block) => block.type === "text")
+    .map((block) => block.text)
+    .join("\n")
+    .trim();
+}
+
+// ---- Process an incoming IMAGE message ----
+async function processImageMessage(fromNumber, mediaId, caption) {
+  try {
+    const image = await downloadWhatsAppImage(mediaId);
+    if (!image) {
+      await sendWhatsAppMessage(
+        fromNumber,
+        "I couldn't open that image. Please try sending it again, or call +91 63995 46064 and our team will help you."
+      );
+      return;
+    }
+
+    const reply = await analyzeImageWithClaude(fromNumber, image, caption);
+
+    // Record it in history so the conversation flows naturally afterwards
+    addToHistory(fromNumber, "user", caption ? `[sent a photo] ${caption}` : "[sent a photo of a wall]");
+    addToHistory(fromNumber, "assistant", reply);
+
+    await sendWhatsAppMessage(fromNumber, reply);
+    console.log(`✓ Image analyzed for ${fromNumber}`);
+  } catch (err) {
+    console.error("Failed to process image:", err.message);
+    await sendWhatsAppMessage(
+      fromNumber,
+      "Sorry, I couldn't analyze that photo right now. Please call +91 63995 46064 — our team can look at it and suggest the right waterproofing solution."
+    );
+  }
+}
+
+
 // ---- Send WhatsApp message via Meta Graph API ----
 async function sendWhatsAppMessage(toNumber, message) {
   if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
@@ -726,12 +853,21 @@ app.post("/webhook", (req, res) => {
     }
 
     const fromNumber = msg.from; // customer's WhatsApp number
+
+    // ---- IMAGE message: analyze the photo (waterproofing / wall diagnosis) ----
+    if (msg.type === "image" && msg.image && msg.image.id) {
+      const caption = (msg.image.caption || "").trim();
+      console.log(`📷 Image from ${fromNumber}${caption ? ": " + caption : ""}`);
+      processImageMessage(fromNumber, msg.image.id, caption);
+      return;
+    }
+
     let incomingText = "";
 
     if (msg.type === "text" && msg.text) {
       incomingText = (msg.text.body || "").trim();
     } else {
-      // Non-text message (image, audio, etc.)
+      // Other non-text message (audio, video, document, etc.)
       incomingText = "";
     }
 
@@ -742,7 +878,7 @@ app.post("/webhook", (req, res) => {
     } else {
       sendWhatsAppMessage(
         fromNumber,
-        "Namaste! I'm CCS Rang Sahayak. Please send a text message and I'll help you with paints, colours, and more. Or call +91 63995 46064."
+        "Namaste! I'm CCS Rang Sahayak 🎨 You can send me a text message about paints and colours — or send a *photo of a damp/leaking wall* and I'll suggest the right waterproofing solution. Or call +91 63995 46064."
       );
     }
   } catch (err) {
