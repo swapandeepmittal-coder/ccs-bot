@@ -377,14 +377,21 @@ async function analyzeImageWithClaude(userId, image, customerCaption) {
 
   const visionInstruction =
     "A customer of the paint shop has sent this photo. Look at it carefully. " +
-    "If it shows a wall problem (damp, seepage, water leakage, peeling paint, " +
-    "cracks, fungus/algae, efflorescence/white powder), then: (1) briefly say " +
-    "what the problem looks like, (2) suggest the likely cause, (3) recommend " +
-    "the right Asian Paints SmartCare waterproofing product for it, and (4) " +
-    "advise visiting Chandra Color Shoppee or calling +91 63995 46064 for an " +
-    "exact solution. If the photo is a room/wall they want painted, suggest " +
-    "suitable shades or finishes instead. If you cannot tell, ask one short " +
-    "question. Keep the reply short and WhatsApp-friendly. " +
+    "If it shows a wall/surface problem (damp, seepage, water leakage, peeling " +
+    "paint, cracks, fungus/algae, efflorescence/white powder): " +
+    "STEP 1 — identify the SURFACE: is it an INTERIOR wall, a TERRACE/ROOF, an " +
+    "EXTERIOR wall, a BATHROOM/wet area, or a CRACK/joint? " +
+    "STEP 2 — briefly say what the problem looks like and the likely cause. " +
+    "STEP 3 — recommend 1-2 SmartCare products ONLY from the matching surface's " +
+    "list in your knowledge (interior damp → Hydroloc Xtreme / Damp Sheath " +
+    "Interior; terrace → Damp Proof / Damp Proof Ultra; exterior → Damp Proof / " +
+    "Damp Sheath Exterior; bathroom → Ultra Block 2K / XtremoSeal; cracks → " +
+    "Crack Seal). NEVER recommend a terrace product for an interior wall. " +
+    "STEP 4 — do NOT quote any price; advise visiting Chandra Color Shoppee or " +
+    "calling +91 63995 46064 for the exact product. " +
+    "If the photo is a room they want painted, suggest suitable shades instead. " +
+    "If you cannot tell the surface, ask one short question. " +
+    "Keep the reply short and WhatsApp-friendly. " +
     (customerCaption ? `The customer also wrote: "${customerCaption}"` : "");
 
   const messages = [
