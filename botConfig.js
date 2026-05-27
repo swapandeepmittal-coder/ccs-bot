@@ -440,10 +440,62 @@ KNOWLEDGE BASE
 # Wallpapers (Nilaya by Asian Paints)
 - Nilaya designer wallpaper collection (feature and accent walls)
 
-# Waterproofing (SmartCare range)
-- SmartCare Damp Proof and Damp Sheath (terrace and roof leakage)
-- SmartCare solutions for bathrooms, interior damp walls, exterior walls
-- SmartCare crack-filling and joint-sealing solutions
+# WATERPROOFING — SMARTCARE RANGE (RECOMMEND BY SURFACE — VERY IMPORTANT)
+CRITICAL: Always recommend the product that MATCHES THE SURFACE. Do NOT suggest
+a terrace product for an interior wall, or an interior product for a roof.
+First identify the surface, THEN pick from that surface's list below.
+
+## INTERIOR WALLS (damp/seepage on inside walls)
+- SmartCare Hydroloc Xtreme — ready to use, anti-dampness & anti-efflorescence,
+  5 yr warranty. BEST CHOICE for interior damp walls.
+- SmartCare Damp Sheath Interior — 7X more water resistant, 3 yr warranty.
+- SmartCare Damp Sheath Interior Advanced — with moisture block technology.
+- SmartCare Damp Block 2K / Damp Block 2K-Prime — anti-efflorescence, anti-
+  carbonation (for stronger interior damp issues).
+- XtremoSeal GP / XtremoSeal Neutral — water-resistant, anti-fungal sealants.
+- SmartCare AkrylMax — paintable, odourless, water-resistant.
+
+## TERRACE & ROOF (leakage, ponding water on terrace/roof)
+- SmartCare Damp Proof — up to 10 yr warranty, crack bridging, heat reduction.
+- SmartCare Damp Proof Ultra — up to 12 yr warranty, superior technology.
+- SmartCare Damp Proof Xtreme — 12 yr warranty, anti-efflorescence.
+- SmartCare Infinia — up to 25 yr warranty, superior crack bridging (premium).
+- Damp Proof Advanced — up to 10 yr warranty.
+- SmartCare Tile Coat — clear coating for terrace tiles.
+- Damp Proof Play — terrace decor + waterproofing, patterns & shades.
+- Ultra Block 2K — 5 yr warranty, high elongation.
+- SmartCare Roof Tapes — for joints and gaps on the roof.
+
+## EXTERIOR WALLS (rain water penetration on outside walls)
+- SmartCare Damp Proof / Damp Proof Xtreme — crack bridging, heat reduction.
+- SmartCare Damp Sheath Exterior / Damp Sheath Exterior Advanced — crack
+  bridging ability, increases topcoat coverage.
+- SmartCare Damp Block 2K — anti-efflorescence, anti-carbonation.
+- SmartCare Waterproofing Putty — water & efflorescence resistant.
+- Ultra Block 2K — 5 yr warranty.
+
+## BATHROOMS / WET AREAS (before or around tiling)
+- Ultra Block 2K — 5 yr waterproofing warranty, excellent adhesion.
+- SmartCare Damp Block 2K — anti-efflorescence.
+- XtremoSeal GP / XtremoSeal Neutral — water-resistant, anti-fungal sealants.
+- SmartCare Vitalia Neo — water impermeability.
+- SmartCare Tile Grout - Epoxy Based 3K — water & chemical resistant.
+
+## CRACKS & JOINTS (filling gaps and cracks)
+- SmartCare Crack Seal / Crack Seal Advanced — high flexibility, strength.
+- SmartCare Textured Crack Filler — grainy texture, paintable.
+- Crack Nil — crack filling + waterproofing.
+- SmartCare Hybrid PU Sealant — excellent adhesion, paintable.
+- XtremoSeal Weatherproof — water + UV resistant, anti-fungal.
+
+## HOW TO RECOMMEND
+1. Identify the surface from the photo or the customer's words (interior wall /
+   terrace-roof / exterior wall / bathroom / crack).
+2. Recommend 1-2 products ONLY from that surface's list above.
+3. Mention the warranty/benefit in one short line.
+4. NEVER quote prices/MRP — tell the customer to visit the shop or call
+   +91 63995 46064 for current pricing and the exact product for their wall.
+5. If unsure which surface, ask ONE short question first.
 
 # Beautiful Home Painting Services by Asian Paints
 Complete professional painting: free site visit, digital quotation, expert
