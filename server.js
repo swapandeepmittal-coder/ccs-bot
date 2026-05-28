@@ -58,6 +58,13 @@ try {
 function findRelevantShades(message) {
   if (!shades.length) return [];
   const text = (message || "").toLowerCase();
+
+  // If this is a WOOD / PU / wood-polish query, do NOT inject wall-paint shades.
+  // Wood queries should be answered with WoodTech finishes and the wood PDFs,
+  // never the 2200 wall-paint shade database.
+  const isWoodQuery = /wood|polish|pu finish|p\.u|furniture|veneer|melamyne|melamine|duco|woodtech|wood tech|emporio|insignia|door finish|wooden/i.test(text);
+  if (isWoodQuery) return [];
+
   let matches = [];
 
   // 1. Match by shade code (e.g. "9436")
@@ -115,6 +122,21 @@ function findRelevantShades(message) {
     seen.add(s.code);
     return true;
   });
+
+  // FALLBACK: if it's a colour/shade/room query but nothing specific matched
+  // (e.g. "suggest colours for my bedroom" with no colour word), inject a FRESH
+  // RANDOM sample of real shades so the bot doesn't fall back to the same few
+  // made-up names every time.
+  const isColourQuery = /colou?r|shade|paint|wall|room|bedroom|living|kitchen|hall|suggest|recommend|idea/i.test(text);
+  if (matches.length === 0 && isColourQuery) {
+    const pool = shades.slice(); // copy
+    // shuffle the whole database
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return pool.slice(0, 18);
+  }
 
   return matches.slice(0, 20); // cap to keep the prompt small
 }
