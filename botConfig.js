@@ -622,6 +622,52 @@ LUXURY range:
 For textures: budget = Royale Play Playlist range; premium = Lithos / Designer
 Collection / LUXE. The bot can send the matching shade-card PDF for their tier.
 
+### PRODUCT REFERENCE — USES, BENEFITS & APPLICATIONS
+Use this to describe products accurately when a customer asks what something is
+or what it's for. Keep replies short; pick the relevant one.
+
+INTERIOR DESIGNER / LUXURY:
+- Royale Designer Palette by Sabyasachi — luxurious interior walls; premium
+  designer look, curated by Sabyasachi, rich unique colours. For home interiors.
+- Shvet by Royale — whites & ivory interior walls; exclusive shades, low VOC,
+  odourless, variety of sheens. For home interiors.
+
+INTERIOR TEXTURES:
+- Royale Play Material Finishes — creative textured interior walls; durable,
+  easy to clean, unique designs.
+- Royale Play Lithos — interior surfaces inspired by natural stone; natural
+  stone-like textures, high durability. Statement walls, hallways, living rooms.
+- Royale Play Textures IDC — modern trendy textures; customizable, durable,
+  artistic. Living rooms, bedrooms, accent walls.
+- Royale Play Luxe Collection — premium sophisticated designs; luxurious
+  textures, easy maintenance. Living rooms, bedrooms, lounges, study rooms.
+- Royale Play Luxe Italian Collection — high-end Italian-inspired finishes;
+  authentic Italian textures, rich elegant look. High-end interiors, statement
+  walls in living/dining rooms.
+- Royale Play Taana Baana — textures inspired by Indian handlooms & fabrics;
+  traditional charm, distinctive finishes. Accent walls, bedrooms, cultural spaces.
+
+EXTERIOR:
+- Ultima Designer Palette Lux Indica — luxurious India-inspired exterior shades;
+  long-lasting, timeless palette, smooth rich finishes. Exterior walls.
+- Apex Ultima Allura — stone-textured exterior walls; premium stone textures,
+  tough weather & anti-algal resistance, high dust pick-up resistance.
+- Apex Createx — textured exterior; adhesion & waterproofing warranty, durable.
+- Apex Ultima Protek Duralife — long-lasting exterior protection; anti-algal
+  triad, dustproof, fade-resistant, crack bridging, performance warranty. Best
+  for extreme weather.
+- Apex Ultima Protek — heavy-duty exterior protection; anti-algal, high UV
+  resistance, 7-10 yr durability, high sheen.
+- Apex Floor Guard — heavy-duty floor protection; abrasion & skid resistant.
+- Apex (Shade Card range) — vibrant durable exterior; weather guard, superior
+  adhesion, anti-fading, budget friendly.
+
+WOOD (WoodTech):
+- WoodTech Insignia — premium wood surfaces; scratch & water resistant, rich
+  finish (glossy/satin/matt). Furniture, cabinetry, doors, wooden features.
+- WoodTech Spectra — high-end wood, especially furniture; vibrant finish,
+  excellent durability, variety of shades.
+
 General room guidance (use ONLY to interpret the customer, not as fixed answers):
 - Living room: warm neutrals, or one bold feature wall
 - Bedroom: calm, restful tones; or rich deep tones for a cosy luxury feel
