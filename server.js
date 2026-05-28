@@ -807,6 +807,189 @@ async function sendWhatsAppDocument(toNumber, brochure) {
   }
 }
 
+// ============================================================
+//  INSPIRATION-IMAGE VISUALIZER (honest — fresh image, not the
+//  customer's room; tied to a real shade/texture from our knowledge)
+// ============================================================
+
+// Cost guard: limit how many images one customer can generate per day
+const imageQuota = new Map(); // phone -> { count, day }
+const MAX_IMAGES_PER_CUSTOMER_PER_DAY = 3;
+
+function canGenerateImage(phone) {
+  const today = new Date().toISOString().slice(0, 10);
+  const rec = imageQuota.get(phone);
+  if (!rec || rec.day !== today) {
+    imageQuota.set(phone, { count: 1, day: today });
+    return true;
+  }
+  if (rec.count >= MAX_IMAGES_PER_CUSTOMER_PER_DAY) return false;
+  rec.count += 1;
+  return true;
+}
+
+// Detect a request to SEE/VISUALIZE a colour or texture
+function detectVisualizerRequest(message) {
+  const text = (message || "").toLowerCase();
+  return /visuali[sz]e|see (it|the|my|how)|how (will|would) (it|my).*look|show me (a|how|the look)|preview|imagine|kaisa lagega|dikha|design (idea|preview)|inspiration|mockup|render/i.test(text);
+}
+
+// Pick a real shade from the database that matches a colour word in the message
+function pickShadeForVisual(message) {
+  const found = findRelevantShades(message);
+  if (found && found.length) return found[Math.floor(Math.random() * found.length)];
+  if (shades.length) return shades[Math.floor(Math.random() * shades.length)];
+  return null;
+}
+
+// Generate an image via OpenAI, return base64 PNG (or null)
+async function generateInspirationImage(promptText) {
+  if (!OPENAI_API_KEY) return null;
+  try {
+    const resp = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-image-1",
+        prompt: promptText,
+        n: 1,
+        size: "1024x1024",
+      }),
+    });
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error("OpenAI image generation failed:", resp.status, errText);
+      return null;
+    }
+    const data = await resp.json();
+    // gpt-image-1 returns base64 in data[0].b64_json
+    const b64 = data?.data?.[0]?.b64_json;
+    return b64 || null;
+  } catch (err) {
+    console.error("Error generating image:", err.message);
+    return null;
+  }
+}
+
+// Upload an image (base64) to Meta and send it to the customer with a caption
+async function sendWhatsAppImage(toNumber, base64Png, caption) {
+  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) return false;
+  try {
+    // 1. Upload the image to Meta to get a media ID
+    const buffer = Buffer.from(base64Png, "base64");
+    const form = new FormData();
+    form.append("messaging_product", "whatsapp");
+    form.append("file", new Blob([buffer], { type: "image/png" }), "inspiration.png");
+
+    const uploadResp = await fetch(
+      `https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_NUMBER_ID}/media`,
+      { method: "POST", headers: { "Authorization": `Bearer ${WHATSAPP_TOKEN}` }, body: form }
+    );
+    if (!uploadResp.ok) {
+      console.error("Meta image upload failed:", await uploadResp.text());
+      return false;
+    }
+    const { id: mediaId } = await uploadResp.json();
+
+    // 2. Send the image message
+    const sendResp = await fetch(
+      `https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
+      {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${WHATSAPP_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to: toNumber,
+          type: "image",
+          image: { id: mediaId, caption: caption || "" },
+        }),
+      }
+    );
+    if (!sendResp.ok) {
+      console.error("Meta image send failed:", await sendResp.text());
+      return false;
+    }
+    console.log(`✓ Inspiration image sent to ${toNumber}`);
+    return true;
+  } catch (err) {
+    console.error("Error sending WhatsApp image:", err.message);
+    return false;
+  }
+}
+
+// Full flow: customer wants to visualize → pick shade → generate → send (honestly labelled)
+async function processVisualizerRequest(fromNumber, message) {
+  // Cost guard
+  if (!canGenerateImage(fromNumber)) {
+    await sendWhatsAppMessage(
+      fromNumber,
+      "You've reached today's preview limit 🎨 Please visit Chandra Color Shoppee to see more options on real shade cards, or call +91 63995 46064."
+    );
+    return;
+  }
+
+  // Tell the customer it's being prepared (image takes ~20s)
+  await sendWhatsAppMessage(
+    fromNumber,
+    "🎨 Creating an inspiration image for you... this takes a few seconds. Please wait."
+  );
+
+  // Pick a real shade from our knowledge
+  const shade = pickShadeForVisual(message);
+  const shadeName = shade ? `${shade.name} (${shade.code})` : "a warm neutral shade";
+
+  // Detect if they mentioned a texture
+  const text = message.toLowerCase();
+  let textureNote = "";
+  if (/texture|royale play|lithos|stucco|concrete|marmorino/i.test(text)) {
+    textureNote = " with a subtle Royale Play textured finish on one feature wall";
+  }
+
+  // Detect room type
+  const room = /bedroom/i.test(text) ? "bedroom"
+    : /living|hall|drawing/i.test(text) ? "living room"
+    : /kitchen/i.test(text) ? "kitchen"
+    : /office/i.test(text) ? "office"
+    : "living room";
+
+  const prompt =
+    `A realistic, well-lit interior design photo of a modern Indian ${room}, ` +
+    `with the walls painted in a colour similar to "${shade ? shade.name : "warm neutral"}"` +
+    `${textureNote}. Tasteful furniture, natural daylight, magazine-style interior ` +
+    `photography, photorealistic, no text, no watermark.`;
+
+  const b64 = await generateInspirationImage(prompt);
+
+  if (!b64) {
+    await sendWhatsAppMessage(
+      fromNumber,
+      `I couldn't create the image right now, but I'd suggest *${shadeName}* for your ${room} 🎨 ` +
+      `Visit Chandra Color Shoppee to see it on a real shade card, or call +91 63995 46064.`
+    );
+    return;
+  }
+
+  const caption =
+    `🎨 Inspiration image — ${room} in *${shadeName}*${textureNote ? " + Royale Play texture" : ""}.\n\n` +
+    `⚠️ This is an approximate AI inspiration image, NOT your actual room. The real ` +
+    `shade may look different in your light. Please visit us to see the real shade ` +
+    `card before deciding.\n📍 Chandra Color Shoppee · 📞 +91 63995 46064`;
+
+  const sent = await sendWhatsAppImage(fromNumber, b64, caption);
+  if (!sent) {
+    await sendWhatsAppMessage(
+      fromNumber,
+      `I'd suggest *${shadeName}* for your ${room} 🎨 Visit us to see it on a real shade card, or call +91 63995 46064.`
+    );
+  }
+
+  addToHistory(fromNumber, "user", `[asked to visualize] ${message}`);
+  addToHistory(fromNumber, "assistant", `Sent an inspiration image in ${shadeName} for a ${room}.`);
+}
+
 
 // Decide which brochure(s) the customer is asking for. Returns array of keys.
 // Sends at most a few PDFs per query so the customer's WhatsApp isn't flooded.
@@ -867,6 +1050,14 @@ function detectBrochureRequest(message) {
 
 async function processMessage(fromNumber, incomingMessage) {
   try {
+    // ---- VISUALIZER: if the customer wants to SEE a colour/texture, generate
+    // an inspiration image instead of the normal text flow ----
+    if (OPENAI_API_KEY && detectVisualizerRequest(incomingMessage)) {
+      console.log(`🖼️  Visualizer request from ${fromNumber}: ${incomingMessage}`);
+      await processVisualizerRequest(fromNumber, incomingMessage);
+      return;
+    }
+
     const history = getHistory(fromNumber);
     const customerType = detectCustomerType(history, incomingMessage);
 
