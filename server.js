@@ -145,6 +145,7 @@ app.use(express.urlencoded({ extended: false }));
 
 // ---- Settings (from environment variables) ----
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY; // for voice-note transcription (Whisper)
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
@@ -390,6 +391,106 @@ async function downloadWhatsAppImage(mediaId) {
   } catch (err) {
     console.error("Error downloading WhatsApp image:", err.message);
     return null;
+  }
+}
+
+// ---- Download an audio/voice note that a customer sent on WhatsApp ----
+async function downloadWhatsAppAudio(mediaId) {
+  try {
+    const metaResp = await fetch(
+      `https://graph.facebook.com/v21.0/${mediaId}`,
+      { headers: { "Authorization": `Bearer ${WHATSAPP_TOKEN}` } }
+    );
+    if (!metaResp.ok) {
+      console.error("Could not get audio media URL:", metaResp.status);
+      return null;
+    }
+    const metaData = await metaResp.json();
+    if (!metaData.url) return null;
+
+    const audioResp = await fetch(metaData.url, {
+      headers: { "Authorization": `Bearer ${WHATSAPP_TOKEN}` },
+    });
+    if (!audioResp.ok) {
+      console.error("Could not download audio:", audioResp.status);
+      return null;
+    }
+    const buffer = Buffer.from(await audioResp.arrayBuffer());
+    const mimeType = metaData.mime_type || "audio/ogg";
+    return { buffer, mimeType };
+  } catch (err) {
+    console.error("Error downloading WhatsApp audio:", err.message);
+    return null;
+  }
+}
+
+// ---- Transcribe audio to text using OpenAI Whisper ----
+async function transcribeAudio(audio) {
+  if (!OPENAI_API_KEY) {
+    console.error("OPENAI_API_KEY not set — cannot transcribe voice note");
+    return null;
+  }
+  try {
+    // WhatsApp voice notes are usually .ogg (opus). Whisper accepts ogg.
+    const ext = audio.mimeType.includes("mpeg") ? "mp3"
+      : audio.mimeType.includes("mp4") || audio.mimeType.includes("m4a") ? "m4a"
+      : audio.mimeType.includes("wav") ? "wav"
+      : "ogg";
+
+    const form = new FormData();
+    form.append("file", new Blob([audio.buffer], { type: audio.mimeType }), `voice.${ext}`);
+    form.append("model", "whisper-1");
+    // Let Whisper auto-detect language (handles Hindi/English/Hinglish)
+
+    const resp = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${OPENAI_API_KEY}` },
+      body: form,
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error("Whisper transcription failed:", resp.status, errText);
+      return null;
+    }
+    const data = await resp.json();
+    return (data.text || "").trim();
+  } catch (err) {
+    console.error("Error transcribing audio:", err.message);
+    return null;
+  }
+}
+
+// ---- Process an incoming VOICE NOTE / audio message ----
+async function processAudioMessage(fromNumber, mediaId) {
+  try {
+    const audio = await downloadWhatsAppAudio(mediaId);
+    if (!audio) {
+      await sendWhatsAppMessage(
+        fromNumber,
+        "I couldn't open that voice note. Please type your question, or call +91 63995 46064."
+      );
+      return;
+    }
+
+    const transcript = await transcribeAudio(audio);
+    if (!transcript) {
+      await sendWhatsAppMessage(
+        fromNumber,
+        "🎤 I received your voice note but couldn't understand it clearly. Could you please type your question, or call us at +91 63995 46064?"
+      );
+      return;
+    }
+
+    console.log(`🎤 Voice note from ${fromNumber} transcribed: "${transcript}"`);
+    // Feed the transcribed text into the normal message flow
+    await processMessage(fromNumber, transcript);
+  } catch (err) {
+    console.error("Failed to process voice note:", err.message);
+    await sendWhatsAppMessage(
+      fromNumber,
+      "Sorry, I couldn't process that voice note. Please type your question or call +91 63995 46064."
+    );
   }
 }
 
@@ -891,6 +992,13 @@ app.post("/webhook", (req, res) => {
       return;
     }
 
+    // ---- VOICE NOTE / audio message: transcribe then process as text ----
+    if (msg.type === "audio" && msg.audio && msg.audio.id) {
+      console.log(`🎤 Voice note from ${fromNumber}`);
+      processAudioMessage(fromNumber, msg.audio.id);
+      return;
+    }
+
     let incomingText = "";
 
     if (msg.type === "text" && msg.text) {
@@ -925,7 +1033,8 @@ app.listen(PORT, () => {
   console.log(`✓ Model: ${MODEL}`);
   console.log(`✓ WhatsApp: ${WHATSAPP_TOKEN && WHATSAPP_PHONE_NUMBER_ID ? "configured" : "NOT configured"}`);
   console.log(`✓ Webhook verify token: ${WHATSAPP_VERIFY_TOKEN ? "set" : "NOT set"}`);
-  console.log(`✓ Google Sheets: ${sheetsClient ? "configured" : "not configured"}\n`);
+  console.log(`✓ Google Sheets: ${sheetsClient ? "configured" : "not configured"}`);
+  console.log(`✓ Voice notes (Whisper): ${OPENAI_API_KEY ? "configured" : "NOT configured — voice notes will ask customer to type"}\n`);
 
   // Pre-upload all brochure PDFs to Meta in the background so the first
   // customer who asks gets them instantly. Failures here are non-fatal —
