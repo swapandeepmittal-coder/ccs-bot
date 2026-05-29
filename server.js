@@ -937,12 +937,18 @@ async function processVisualizerRequest(fromNumber, message) {
     "🎨 Creating an inspiration image for you... this takes a few seconds. Please wait."
   );
 
-  // Pick a real shade from our knowledge
-  const shade = pickShadeForVisual(message);
+  // EXACT CODE: if the customer typed a specific shade code, use THAT shade.
+  // Otherwise pick a relevant shade from the database.
+  const text = message.toLowerCase();
+  const codeMatch = text.match(/\b\d{3,4}\b/);
+  let shade = null;
+  if (codeMatch && shades.length) {
+    shade = shades.find((s) => s.code === codeMatch[0]) || null;
+  }
+  if (!shade) shade = pickShadeForVisual(message);
   const shadeName = shade ? `${shade.name} (${shade.code})` : "a warm neutral shade";
 
   // Detect if they mentioned a texture
-  const text = message.toLowerCase();
   let textureNote = "";
   if (/texture|royale play|lithos|stucco|concrete|marmorino/i.test(text)) {
     textureNote = " with a subtle Royale Play textured finish on one feature wall";
@@ -955,11 +961,14 @@ async function processVisualizerRequest(fromNumber, message) {
     : /office/i.test(text) ? "office"
     : "living room";
 
+  // Bright, natural, light-toned image (not dark)
   const prompt =
-    `A realistic, well-lit interior design photo of a modern Indian ${room}, ` +
-    `with the walls painted in a colour similar to "${shade ? shade.name : "warm neutral"}"` +
-    `${textureNote}. Tasteful furniture, natural daylight, magazine-style interior ` +
-    `photography, photorealistic, no text, no watermark.`;
+    `A bright, airy, naturally-lit interior design photo of a modern Indian ${room}. ` +
+    `Walls painted in a colour similar to "${shade ? shade.name : "warm neutral"}"` +
+    `${textureNote}. Tasteful contemporary furniture, plenty of soft natural daylight ` +
+    `through windows, light and welcoming atmosphere, clean and uncluttered. ` +
+    `Magazine-style interior photography, photorealistic, high quality, no text, ` +
+    `no watermark.`;
 
   const b64 = await generateInspirationImage(prompt);
 
@@ -992,54 +1001,54 @@ async function processVisualizerRequest(fromNumber, message) {
 
 
 // Decide which brochure(s) the customer is asking for. Returns array of keys.
-// Sends at most a few PDFs per query so the customer's WhatsApp isn't flooded.
+// Specific product names route to the specific matching PDF.
 function detectBrochureRequest(message) {
   const text = (message || "").toLowerCase();
 
-  const wantsIt = /catalog|catalogue|brochure|book|booklet|pdf|samples?|designs?|show|send|magazine|shade card|shadecard|share/i.test(text);
-
-  const mentionsWood = /wood|polish|furniture|emporio|insignia|veneer|melamyne|pu finish|wood coat/i.test(text);
-  const mentionsExterior = /exterior|outside|outer wall|apex|ultima|ace |duralife|weatherproof/i.test(text);
-  const mentionsInterior = /interior shade|inside shade|royale shade|apcolite|tractor|interior colour|interior color/i.test(text);
-  const mentionsLuxuryTexture = /luxury texture|lithos|infinitex|luxindica|designer collection|premium texture/i.test(text);
-  const mentionsBudgetTexture = /budget texture|playlist|cheap texture|affordable texture/i.test(text);
-  const mentionsTexture = /texture|royale play|feature wall|designer wall|stucco|marmorino|stellato|archi concrete|calcecruda/i.test(text);
-  const mentionsFloor = /floor coat|floor guard|floor paint|floor shade/i.test(text);
-  const mentionsShadeCard = /shade card|shadecard|colour card|color card/i.test(text);
-
-  const wanted = [];
-
-  // Wood — send the 2 wood brochures
-  if (mentionsWood) {
+  // ---- SPECIFIC PRODUCT NAMES → SPECIFIC PDFs (checked first, most precise) ----
+  // Wood-specific products
+  if (/emporio/i.test(text)) return ["woodEmporio"];
+  if (/insignia/i.test(text)) return ["woodInsignia"];
+  if (/wood|polish|furniture|veneer|melamyne|pu finish|wood coat|woodtech/i.test(text)) {
     return ["woodEmporio", "woodInsignia"];
   }
 
-  // Floor coating
-  if (mentionsFloor) {
-    return ["floorGuard"];
-  }
+  // Specific interior products
+  if (/tractor/i.test(text)) return ["interior3"]; // Tractor shade card
+  if (/apcolite/i.test(text)) return ["interior4"]; // Apcolite shade card
+  if (/royale designer|sabyasachi/i.test(text)) return ["interior1"]; // Designer Palette
+  if (/royale/i.test(text)) return ["interior2", "interior1"]; // main Royale + Designer
 
-  // Exterior shade cards — send the 2 main ones (not all 4 duplicates)
-  if (mentionsExterior) {
-    wanted.push("exterior1", "exterior4");
-  }
+  // Specific exterior products
+  if (/ace/i.test(text)) return ["exterior2"]; // Ace shade card
+  if (/duralife|protek duralife/i.test(text)) return ["exterior4"]; // Duralife
+  if (/ultima|apex ultima/i.test(text)) return ["exterior1"]; // Apex Ultima Protek
+  if (/apex/i.test(text)) return ["exterior1", "exterior4"]; // Apex variants
 
-  // Interior shade cards — send the 2 main ones
-  if (mentionsInterior || (mentionsShadeCard && !mentionsExterior)) {
-    wanted.push("interior2", "interior1");
-  }
+  // Specific texture products
+  if (/lithos/i.test(text)) return ["luxuryTexture2"];
+  if (/infinitex/i.test(text)) return ["luxuryTexture3"];
+  if (/luxindica/i.test(text)) return ["luxuryTexture4"];
+  if (/designer collection|royale play designer/i.test(text)) return ["luxuryTexture1"];
+  if (/playlist/i.test(text)) return ["budgetTexture1"];
 
-  // Luxury textures
-  if (mentionsLuxuryTexture) {
-    wanted.push("luxuryTexture1", "luxuryTexture2");
-  }
+  // Floor
+  if (/floor coat|floor guard|floor paint|floor shade/i.test(text)) return ["floorGuard"];
 
-  // Budget textures
-  if (mentionsBudgetTexture) {
-    wanted.push("budgetTexture1", "budgetTexture3");
-  }
+  // ---- GENERIC CATEGORY QUERIES → 2 PDFs MAX ----
+  const wanted = [];
 
-  // Generic "texture" with no budget/luxury specified — send one of each
+  const mentionsExterior = /exterior|outside|outer wall|weatherproof/i.test(text);
+  const mentionsInterior = /interior shade|inside shade|interior colour|interior color|interior paint/i.test(text);
+  const mentionsLuxuryTexture = /luxury texture|premium texture/i.test(text);
+  const mentionsBudgetTexture = /budget texture|cheap texture|affordable texture/i.test(text);
+  const mentionsTexture = /texture|royale play|feature wall|designer wall|stucco|marmorino|stellato|archi concrete|calcecruda/i.test(text);
+  const mentionsShadeCard = /shade card|shadecard|colour card|color card/i.test(text);
+
+  if (mentionsExterior) wanted.push("exterior1", "exterior4");
+  if (mentionsInterior || (mentionsShadeCard && !mentionsExterior)) wanted.push("interior2", "interior1");
+  if (mentionsLuxuryTexture) wanted.push("luxuryTexture1", "luxuryTexture2");
+  if (mentionsBudgetTexture) wanted.push("budgetTexture1", "budgetTexture3");
   if (mentionsTexture && !mentionsLuxuryTexture && !mentionsBudgetTexture) {
     wanted.push("luxuryTexture1", "budgetTexture1");
   }
