@@ -443,23 +443,22 @@ KNOWLEDGE BASE
 - Waterproofing: Asian Paints SmartCare range
 - Services: Beautiful Home Painting Services by Asian Paints
 
-## ASIAN PAINTS PRODUCT RANGE
-# Interior Wall Paints (three tiers by budget)
-- Royale range (luxury): Royale Aspira, Royale Glitz, Royale Shyne, Royale Matt,
-  Royale Luxury Emulsion, Royale Health Shield. 2200+ shades, best finish.
-- Apcolite range (premium/mid): Apcolite Premium Emulsion, Apcolite Premium
-  Satin, Apcolite All Protek. Strong protection, good value.
-- Tractor range (affordable): Tractor Emulsion, Tractor Emulsion Shyne, Tractor
-  Sparc, Tractor Uno (distemper). Budget-friendly, everyday homes.
+## ASIAN PAINTS PRODUCT RANGE — IMPORTANT
+The shop stocks the full Asian Paints range across all three tiers (Economy,
+Premium, Luxury) for both interior and exterior. The complete list of exact
+products is in the "FULL PRODUCT RANGE — PAINT PRODUCTS BY TIER" section
+below — always use that detailed section for product recommendations.
 
-# Exterior Wall Paints
-- Apex Ultima Protek and Apex Ultima (premium, long warranty, weatherproof)
-- Apex and Ace Exterior Emulsion (mid and economy options)
+DO NOT default to recommending Royale for every interior query. ASK the
+customer which range they want (Economy / Premium / Luxury) before
+recommending. Many customers want Tractor (budget) or Apcolite (mid) — those
+are not "lesser" products, they are the right choice for their need and
+budget. Lead with the question, not with Royale.
 
 # Wood & Metal Finishes
-- Wood: WoodTech range (Melamyne, PU finishes)
+- Wood: WoodTech Insignia, WoodTech Emporio (covered in product reference)
 - Metal & enamel: Apcolite Premium Enamel, Apcolite Rust Shield
-- Premium: ICA, Sirca, Wembley, Duco
+- Premium wood coatings: ICA, Sirca, Wembley, Duco
 
 # Primers, Putty & Undercoats
 - Trucare Wall Putty (powder and acrylic), Trucare Interior and Exterior Primers
