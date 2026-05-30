@@ -1000,6 +1000,90 @@ async function processVisualizerRequest(fromNumber, message) {
 }
 
 
+// ============================================================
+//  SHADE-CARD MENU — let customer pick exactly which PDF(s) they want
+// ============================================================
+
+// Track which customers were just shown the menu (so we can interpret their
+// number reply correctly). Expires automatically after 10 minutes.
+const menuWaiting = new Map(); // phone -> timestamp
+
+function isWaitingForMenuReply(phone) {
+  const ts = menuWaiting.get(phone);
+  if (!ts) return false;
+  // expire after 10 minutes
+  if (Date.now() - ts > 10 * 60 * 1000) {
+    menuWaiting.delete(phone);
+    return false;
+  }
+  return true;
+}
+
+function markMenuShown(phone) {
+  menuWaiting.set(phone, Date.now());
+}
+
+function clearMenuWaiting(phone) {
+  menuWaiting.delete(phone);
+}
+
+// The shade-card menu text (English; bot will translate via the system prompt
+// if the customer's language is Hindi/Hinglish — the menu numbers stay the same)
+const SHADE_CARD_MENU =
+  "Which shade card would you like? Please reply with the number 👇\n\n" +
+  "🏠 *INTERIOR*\n" +
+  "1️⃣ Economy — Tractor Emulsion / Advanced / Shyne / Shyne Advanced\n" +
+  "2️⃣ Premium — Apcolite Premium Matt / Advanced Matt / Advanced Shyne / All Protek\n" +
+  "3️⃣ Luxury — Royale Luxury Emulsion / Shyne / Matt / Glitz / Glitz Ultra Matt / Glitz Reserve\n\n" +
+  "🏡 *EXTERIOR*\n" +
+  "4️⃣ Economy — Ace / Ace Advanced / Ace Shyne\n" +
+  "5️⃣ Premium — Apex / Apex Advanced / Apex Shyne / Apex Shyne Advanced\n" +
+  "6️⃣ Luxury — Ultima / Ultima Protek / Ultima Protek Duralife\n\n" +
+  "🎨 *TEXTURES*\n" +
+  "7️⃣ Budget — Royale Play Playlist range\n" +
+  "8️⃣ Luxury — Lithos, Designer Collection, Infinitex, Luxindica\n\n" +
+  "🪵 *WOOD*\n" +
+  "9️⃣ WoodTech Emporio & Insignia\n\n" +
+  "🦶 *FLOOR*\n" +
+  "🔟 Apex Floor Guard\n\n" +
+  "📦 *SEND ALL*\n" +
+  "11. ALL interior shade cards\n" +
+  "12. ALL exterior shade cards\n" +
+  "13. ALL texture shade cards\n\n" +
+  "Or just type a product name (e.g. \"Tractor\", \"Royale\", \"Lithos\").";
+
+// Map a customer's number reply (1-13) to which PDFs to send
+function brochuresForMenuNumber(num) {
+  switch (num) {
+    case 1: return ["interior3"];                        // Tractor
+    case 2: return ["interior4"];                        // Apcolite
+    case 3: return ["interior2", "interior1"];           // Royale + Designer Palette
+    case 4: return ["exterior2"];                        // Ace
+    case 5: return ["exterior1"];                        // Apex Ultima Protek
+    case 6: return ["exterior1", "exterior4"];           // Ultima Protek + Duralife
+    case 7: return ["budgetTexture1", "budgetTexture2"]; // Playlist range
+    case 8: return ["luxuryTexture1", "luxuryTexture2", "luxuryTexture3", "luxuryTexture4"];
+    case 9: return ["woodEmporio", "woodInsignia"];      // both wood
+    case 10: return ["floorGuard"];                      // floor
+    case 11: return ["interior3", "interior4", "interior2", "interior1"]; // ALL interior
+    case 12: return ["exterior2", "exterior1", "exterior4"];              // ALL exterior
+    case 13: return ["budgetTexture1", "budgetTexture2", "budgetTexture3",
+                     "luxuryTexture1", "luxuryTexture2", "luxuryTexture3", "luxuryTexture4"];
+    default: return [];
+  }
+}
+
+// Detect a generic shade-card / catalogue request that should trigger the menu
+// (specific product names are NOT generic — they route directly without the menu)
+function isGenericShadeCardRequest(message) {
+  const text = (message || "").toLowerCase();
+  // If it already names a specific product, it's not generic
+  const specific = /emporio|insignia|tractor|apcolite|royale|sabyasachi|ace|apex|ultima|duralife|lithos|infinitex|luxindica|playlist|designer collection|floor guard/i.test(text);
+  if (specific) return false;
+  // Generic phrasing
+  return /shade card|shadecard|catalog|catalogue|brochure|colour card|color card|pdf|all shade|send me everything|what (do )?you have|product range|product catalog/i.test(text);
+}
+
 // Decide which brochure(s) the customer is asking for. Returns array of keys.
 // Specific product names route to the specific matching PDF.
 function detectBrochureRequest(message) {
@@ -1079,6 +1163,47 @@ function detectBrochureRequest(message) {
 
 async function processMessage(fromNumber, incomingMessage) {
   try {
+    // ---- SHADE-CARD MENU: if customer was just shown the menu, handle their number reply ----
+    if (isWaitingForMenuReply(fromNumber)) {
+      const numMatch = (incomingMessage || "").trim().match(/^(\d{1,2})\b/);
+      if (numMatch) {
+        const num = parseInt(numMatch[1], 10);
+        const keys = brochuresForMenuNumber(num);
+        if (keys.length > 0) {
+          clearMenuWaiting(fromNumber);
+          const isAllRequest = num === 11 || num === 12 || num === 13;
+          const note = isAllRequest
+            ? `Sending you ${keys.length} PDFs 📄 — please wait a moment for all of them.`
+            : `Sending the shade card 📄 — please wait a moment.`;
+          await sendWhatsAppMessage(fromNumber, note);
+          for (const key of keys) {
+            const b = BROCHURES[key];
+            if (b) await sendWhatsAppDocument(fromNumber, b);
+          }
+          await sendWhatsAppMessage(
+            fromNumber,
+            "Anything else I can help with? You can visit the shop or call +91 63995 46064 to see physical shade cards. 🎨"
+          );
+          addToHistory(fromNumber, "user", incomingMessage);
+          addToHistory(fromNumber, "assistant", `Sent ${keys.length} PDF(s) from menu choice ${num}.`);
+          return;
+        }
+      }
+      // If they didn't reply with a valid number, fall through to normal flow
+      // and clear the menu state so we don't loop
+      clearMenuWaiting(fromNumber);
+    }
+
+    // ---- SHADE-CARD MENU: generic shade-card request → show the menu, don't guess ----
+    if (isGenericShadeCardRequest(incomingMessage)) {
+      console.log(`📋 Showing shade-card menu to ${fromNumber}`);
+      markMenuShown(fromNumber);
+      await sendWhatsAppMessage(fromNumber, SHADE_CARD_MENU);
+      addToHistory(fromNumber, "user", incomingMessage);
+      addToHistory(fromNumber, "assistant", "[Showed shade-card menu]");
+      return;
+    }
+
     // ---- VISUALIZER: if the customer wants to SEE a colour/texture, generate
     // an inspiration image instead of the normal text flow ----
     if (OPENAI_API_KEY && detectVisualizerRequest(incomingMessage)) {
