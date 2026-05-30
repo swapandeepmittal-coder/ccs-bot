@@ -1039,14 +1039,34 @@ function detectBrochureRequest(message) {
   const wanted = [];
 
   const mentionsExterior = /exterior|outside|outer wall|weatherproof/i.test(text);
-  const mentionsInterior = /interior shade|inside shade|interior colour|interior color|interior paint/i.test(text);
+  const mentionsInterior = /interior shade|inside shade|interior colour|interior color|interior paint|interior catalog|interior catalogue/i.test(text);
   const mentionsLuxuryTexture = /luxury texture|premium texture/i.test(text);
   const mentionsBudgetTexture = /budget texture|cheap texture|affordable texture/i.test(text);
   const mentionsTexture = /texture|royale play|feature wall|designer wall|stucco|marmorino|stellato|archi concrete|calcecruda/i.test(text);
   const mentionsShadeCard = /shade card|shadecard|colour card|color card/i.test(text);
 
-  if (mentionsExterior) wanted.push("exterior1", "exterior4");
-  if (mentionsInterior || (mentionsShadeCard && !mentionsExterior)) wanted.push("interior2", "interior1");
+  // Detect range keywords so generic queries can route to the right tier
+  const isEconomy = /economy|budget|cheap|affordable|low cost|low-cost|sasta/i.test(text);
+  const isPremium = /premium|mid range|mid-range|medium/i.test(text);
+  const isLuxury = /luxury|luxurious|royale|high end|high-end|top range/i.test(text);
+
+  if (mentionsExterior) {
+    // Exterior with range
+    if (isEconomy) wanted.push("exterior2"); // Ace
+    else if (isLuxury) wanted.push("exterior1", "exterior4"); // Apex Ultima Protek + Duralife
+    else if (isPremium) wanted.push("exterior1"); // Apex Ultima Protek
+    else wanted.push("exterior2", "exterior1"); // both — let customer see options
+  }
+
+  if (mentionsInterior || (mentionsShadeCard && !mentionsExterior)) {
+    // Interior with range — THIS WAS THE BUG: was always sending Royale
+    if (isEconomy) wanted.push("interior3"); // Tractor
+    else if (isPremium) wanted.push("interior4"); // Apcolite
+    else if (isLuxury) wanted.push("interior2", "interior1"); // Royale + Designer
+    else wanted.push("interior3", "interior4"); // no range named: send Tractor + Apcolite
+    // (we leave Royale OUT of the default — bot will ASK for the range first)
+  }
+
   if (mentionsLuxuryTexture) wanted.push("luxuryTexture1", "luxuryTexture2");
   if (mentionsBudgetTexture) wanted.push("budgetTexture1", "budgetTexture3");
   if (mentionsTexture && !mentionsLuxuryTexture && !mentionsBudgetTexture) {
