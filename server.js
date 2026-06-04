@@ -985,7 +985,7 @@ async function processVisualizerRequest(fromNumber, message) {
   if (!canGenerateImage(fromNumber)) {
     await sendWhatsAppMessage(
       fromNumber,
-      "You've reached today's preview limit 🎨 Please visit Chandra Color Shoppee to see more options on real shade cards, or call +91 63995 46064."
+      "You've reached today's preview limit 🎨 Please visit Chandra Color Shoppee to see more options on real shade cards, call *+91 63995 46064*, or reply here with a good time and we'll call you back."
     );
     return;
   }
@@ -1195,7 +1195,8 @@ const WALLPAPER_MENU =
   "✨ *LUXURY / PREMIUM / DESIGNER / IMPORTED*\n" +
   "Our luxury, premium, and imported designer wallpaper collections are best " +
   "seen in person with real samples. Please call *+91 63995 46064* or visit " +
-  "Chandra Color Shoppee to view those.";
+  "Chandra Color Shoppee — or reply here with your name and a good time and " +
+  "we'll call you back.";
 
 // Map wallpaper menu number → brochure keys
 function wallpaperBrochuresForMenuNumber(num) {
@@ -1366,7 +1367,7 @@ async function processMessage(fromNumber, incomingMessage) {
           console.log(`✓ Sent ${sent}/${keys.length} PDFs to ${fromNumber} for menu choice ${num}`);
           await sendWhatsAppMessage(
             fromNumber,
-            "Anything else I can help with? You can visit the shop or call +91 63995 46064 to see physical shade cards. 🎨"
+            "Anything else I can help with? You can visit the shop or call *+91 63995 46064* to see physical shade cards — or just reply here with your name & a good time, and we'll call you back. 🎨"
           );
           addToHistory(fromNumber, "user", incomingMessage);
           addToHistory(fromNumber, "assistant", `Sent ${sent} PDF(s) from menu choice ${num}.`);
@@ -1413,7 +1414,7 @@ async function processMessage(fromNumber, incomingMessage) {
           console.log(`✓ Sent ${sent}/${keys.length} wallpaper PDFs to ${fromNumber} for menu choice ${num}`);
           await sendWhatsAppMessage(
             fromNumber,
-            "For our luxury or imported designer Nilaya range, please call *+91 63995 46064* or visit Chandra Color Shoppee — those are best seen in person. 🎨"
+            "For our luxury or imported designer Nilaya range, please call *+91 63995 46064* or visit Chandra Color Shoppee — or reply here with a good time and we'll call you back. Those are best seen in person. 🎨"
           );
           addToHistory(fromNumber, "user", incomingMessage);
           addToHistory(fromNumber, "assistant", `Sent ${sent} wallpaper PDF(s) from menu choice ${num}.`);
@@ -1430,8 +1431,9 @@ async function processMessage(fromNumber, incomingMessage) {
         fromNumber,
         "For our *luxury, premium, designer, and imported Nilaya wallpaper* collections, " +
         "the catalogues are quite extensive and best seen in person with real samples.\n\n" +
-        "Please call us at *+91 63995 46064* or visit Chandra Color Shoppee at " +
-        "Paschim Puri Crossing, Shastripuram, Agra — and we'll show you the full range.\n\n" +
+        "📞 Please call us at *+91 63995 46064*, visit Chandra Color Shoppee at " +
+        "Paschim Puri Crossing, Shastripuram, Agra — or just reply here with your *name* " +
+        "and a *good time to call*, and we'll call you back.\n\n" +
         "If you'd like, I can send you our Economy or Medium range Nilaya catalogues " +
         "on WhatsApp right now. Just say *wallpaper menu*. 🎨"
       );
@@ -1607,7 +1609,7 @@ app.post("/webhook", (req, res) => {
     } else {
       sendWhatsAppMessage(
         fromNumber,
-        "Namaste! I'm CCS Rang Sahayak 🎨 You can send me a text message about paints and colours — or send a *photo of a damp/leaking wall* and I'll suggest the right waterproofing solution. Or call +91 63995 46064."
+        "Namaste! I'm CCS Rang Sahayak 🎨 You can send me a text message about paints and colours — or send a *photo of a damp/leaking wall* and I'll suggest the right waterproofing solution. You can also call us at *+91 63995 46064*, or just reply here with a good time and we'll call you back."
       );
     }
   } catch (err) {
