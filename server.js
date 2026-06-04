@@ -300,8 +300,35 @@ function formatPhone(waNumber) {
   return digits || "Unknown";
 }
 
+// ---- Detect how the customer heard about CCS ----
+// Scans conversation for clear source mentions (Instagram, Google, friend, walk-in,
+// QR code, Meta ad, etc.). Returns "Not stated" if none mentioned.
+function detectSource(conversationHistory) {
+  // Build one big string from user messages, lowercased
+  const text = conversationHistory
+    .filter(m => m.role === "user")
+    .map(m => String(m.content).toLowerCase())
+    .join(" | ");
+  if (!text) return "Not stated";
+
+  // Order matters — match the most specific signals first
+  if (/\bqr\b|qr code|scanned|counter sticker/i.test(text)) return "QR / Counter";
+  if (/instagram|insta\b|reels?\b/i.test(text)) return "Instagram";
+  if (/facebook|fb ad|fb post|facebook ad/i.test(text)) return "Facebook";
+  if (/google|search|maps?\b/i.test(text)) return "Google / Maps";
+  if (/whatsapp ad|click to whatsapp|ctwa|saw your ad|your ad\b/i.test(text)) return "WhatsApp Ad";
+  if (/(friend|family|relative|neighbour|neighbor|cousin|brother|sister|uncle|aunty|aunt)\s+(told|said|recommend|suggested|gave)/i.test(text)) return "Word of mouth";
+  if (/told (me )?about|recommended by|referred by|suggested by/i.test(text)) return "Word of mouth";
+  if (/passed by|walked by|saw your shop|saw the shop|visited (the )?shop|came to (the )?shop|walk[- ]?in/i.test(text)) return "Walk-in";
+  if (/painter|contractor|mistri\b|labour\b/i.test(text)) return "Painter / Contractor";
+  if (/youtube|video/i.test(text)) return "YouTube";
+  if (/justdial|just dial|sulekha|indiamart/i.test(text)) return "Directory site";
+
+  return "Not stated";
+}
+
 // ---- Save Lead to Google Sheets ----
-async function saveLeadToSheets(phone, name, customerType, requirement) {
+async function saveLeadToSheets(phone, name, customerType, requirement, source) {
   if (!sheetsClient || !GOOGLE_SHEET_ID) return;
   try {
     const timestamp = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
@@ -311,14 +338,15 @@ async function saveLeadToSheets(phone, name, customerType, requirement) {
       customerType || "retail",
       requirement || "General enquiry",
       timestamp,
+      source || "Not stated",
     ];
     await sheetsClient.spreadsheets.values.append({
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: "Leads!A:E",
+      range: "Leads!A:F",
       valueInputOption: "USER_ENTERED",
       resource: { values: [row] },
     });
-    console.log(`✓ Lead saved: ${phone} | name: ${name} (${customerType})`);
+    console.log(`✓ Lead saved: ${phone} | ${name} (${customerType}) | source: ${source || "Not stated"}`);
   } catch (err) {
     console.error("Error saving lead to Sheets:", err.message);
   }
@@ -710,6 +738,37 @@ const BROCHURES = {
   floorGuard: brochure(
     "apexfloorguard-shadecard.pdf",
     "Apex Floor Guard — floor coating shade card"),
+
+  // ---- NILAYA WALLPAPERS — ECONOMY RANGE (Ador + Deco Dynasty) ----
+  wallpaperEcoArtSoul: brochure(
+    "Nilaya Wallpaper - Ador Art & Soul.pdf",
+    "Nilaya Wallpaper — Ador Art & Soul (Economy)"),
+  wallpaperEcoIconic: brochure(
+    "Nilaya Wallpaper - Ador Iconic -1.pdf",
+    "Nilaya Wallpaper — Ador Iconic (Economy)"),
+  wallpaperEcoPalaceLife: brochure(
+    "Nilaya Wallpaper - Ador Palace Life.pdf",
+    "Nilaya Wallpaper — Ador Palace Life (Economy)"),
+  wallpaperEcoSerenade: brochure(
+    "Nilaya Wallpaper - Ador Serenade.pdf",
+    "Nilaya Wallpaper — Ador Serenade (Economy)"),
+  wallpaperEcoDecoDynasty: brochure(
+    "Nilaya Wallpaper - Deco_Dynasty_ ECatalogue.pdf",
+    "Nilaya Wallpaper — Deco Dynasty (Economy)"),
+
+  // ---- NILAYA WALLPAPERS — MEDIUM RANGE ----
+  wallpaperMedNovamurIvy: brochure(
+    "Nilaya Wallpaper M - Novamur lvy_1296X792_Double Spread.pdf",
+    "Nilaya Wallpaper — Novamur Ivy (Medium)"),
+  wallpaperMedBotanica: brochure(
+    "Nilaya Wallpaper M Botanica.pdf",
+    "Nilaya Wallpaper — Botanica (Medium)"),
+  wallpaperMedCityGlow: brochure(
+    "Nilaya Wallpaper M City Glow.pdf",
+    "Nilaya Wallpaper — City Glow (Medium)"),
+  wallpaperMedJackie: brochure(
+    "Nilaya Wallpaper M Jackie.pdf",
+    "Nilaya Wallpaper — Jackie (Medium)"),
 };
 
 
@@ -1004,27 +1063,55 @@ async function processVisualizerRequest(fromNumber, message) {
 //  SHADE-CARD MENU — let customer pick exactly which PDF(s) they want
 // ============================================================
 
-// Track which customers were just shown the menu (so we can interpret their
-// number reply correctly). Expires automatically after 10 minutes.
-const menuWaiting = new Map(); // phone -> timestamp
+// Track which customers were just shown a menu, and WHICH menu. Expires
+// automatically after 30 minutes. Value is { type: "shade" | "wallpaper", ts: timestamp }
+const menuWaiting = new Map(); // phone -> { type, ts }
+
+function getMenuWaiting(phone) {
+  const v = menuWaiting.get(phone);
+  if (!v) return null;
+  if (Date.now() - v.ts > 30 * 60 * 1000) {
+    menuWaiting.delete(phone);
+    return null;
+  }
+  return v.type;
+}
 
 function isWaitingForMenuReply(phone) {
-  const ts = menuWaiting.get(phone);
-  if (!ts) return false;
-  // expire after 10 minutes
-  if (Date.now() - ts > 10 * 60 * 1000) {
-    menuWaiting.delete(phone);
-    return false;
-  }
-  return true;
+  return getMenuWaiting(phone) === "shade";
+}
+
+function isWaitingForWallpaperMenuReply(phone) {
+  return getMenuWaiting(phone) === "wallpaper";
 }
 
 function markMenuShown(phone) {
-  menuWaiting.set(phone, Date.now());
+  menuWaiting.set(phone, { type: "shade", ts: Date.now() });
+}
+
+function markWallpaperMenuShown(phone) {
+  menuWaiting.set(phone, { type: "wallpaper", ts: Date.now() });
 }
 
 function clearMenuWaiting(phone) {
   menuWaiting.delete(phone);
+}
+
+// Pull a 1-2 digit menu choice (1-20) out of a message even if the customer
+// added punctuation, "option", emoji etc. Returns null if no valid number.
+function parseMenuChoice(message) {
+  if (!message) return null;
+  // Remove emoji keycaps and variation selectors so "1️⃣" / "🔟" parse cleanly
+  const cleaned = String(message)
+    .replace(/[\u{1F100}-\u{1F1FF}]|\uFE0F|\u20E3/gu, "")
+    .replace(/[^0-9 a-zA-Z]/g, " ")
+    .trim();
+  // Look for a 1-2 digit number anywhere near the start
+  const m = cleaned.match(/(?:^|\b)(\d{1,2})(?:\b|$)/);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  if (n >= 1 && n <= 20) return n;
+  return null;
 }
 
 // The shade-card menu text (English; bot will translate via the system prompt
@@ -1047,9 +1134,9 @@ const SHADE_CARD_MENU =
   "🦶 *FLOOR*\n" +
   "🔟 Apex Floor Guard\n\n" +
   "📦 *SEND ALL*\n" +
-  "11. ALL interior shade cards\n" +
-  "12. ALL exterior shade cards\n" +
-  "13. ALL texture shade cards\n\n" +
+  "*11.* ALL interior shade cards (sends 4 PDFs)\n" +
+  "*12.* ALL exterior shade cards (sends 3 PDFs)\n" +
+  "*13.* ALL texture shade cards (sends 7 PDFs)\n\n" +
   "Or just type a product name (e.g. \"Tractor\", \"Royale\", \"Lithos\").";
 
 // Map a customer's number reply (1-13) to which PDFs to send
@@ -1084,10 +1171,100 @@ function isGenericShadeCardRequest(message) {
   return /shade card|shadecard|catalog|catalogue|brochure|colour card|color card|pdf|all shade|send me everything|what (do )?you have|product range|product catalog/i.test(text);
 }
 
+
+// ============================================================
+//  WALLPAPER (NILAYA) MENU
+// ============================================================
+
+// The wallpaper menu text — sent when customer asks generically about wallpapers
+const WALLPAPER_MENU =
+  "We carry *Nilaya by Asian Paints* wallpapers. Which range would you like? Reply with the number 👇\n\n" +
+  "💰 *ECONOMY RANGE — Ador & Deco Dynasty*\n" +
+  "1️⃣ Ador Art & Soul\n" +
+  "2️⃣ Ador Iconic\n" +
+  "3️⃣ Ador Palace Life\n" +
+  "4️⃣ Ador Serenade\n" +
+  "5️⃣ Deco Dynasty\n" +
+  "6️⃣ Send ALL Economy (5 PDFs)\n\n" +
+  "🎨 *MEDIUM RANGE*\n" +
+  "7️⃣ Novamur Ivy\n" +
+  "8️⃣ Botanica\n" +
+  "9️⃣ City Glow\n" +
+  "🔟 Jackie\n" +
+  "*11.* Send ALL Medium (4 PDFs)\n\n" +
+  "✨ *LUXURY / PREMIUM / DESIGNER / IMPORTED*\n" +
+  "Our luxury, premium, and imported designer wallpaper collections are best " +
+  "seen in person with real samples. Please call *+91 63995 46064* or visit " +
+  "Chandra Color Shoppee to view those.";
+
+// Map wallpaper menu number → brochure keys
+function wallpaperBrochuresForMenuNumber(num) {
+  switch (num) {
+    case 1: return ["wallpaperEcoArtSoul"];
+    case 2: return ["wallpaperEcoIconic"];
+    case 3: return ["wallpaperEcoPalaceLife"];
+    case 4: return ["wallpaperEcoSerenade"];
+    case 5: return ["wallpaperEcoDecoDynasty"];
+    case 6: return [
+      "wallpaperEcoArtSoul", "wallpaperEcoIconic", "wallpaperEcoPalaceLife",
+      "wallpaperEcoSerenade", "wallpaperEcoDecoDynasty"
+    ];
+    case 7: return ["wallpaperMedNovamurIvy"];
+    case 8: return ["wallpaperMedBotanica"];
+    case 9: return ["wallpaperMedCityGlow"];
+    case 10: return ["wallpaperMedJackie"];
+    case 11: return [
+      "wallpaperMedNovamurIvy", "wallpaperMedBotanica",
+      "wallpaperMedCityGlow", "wallpaperMedJackie"
+    ];
+    default: return [];
+  }
+}
+
+// Detect a generic wallpaper request → triggers the wallpaper menu
+function isGenericWallpaperRequest(message) {
+  const text = (message || "").toLowerCase();
+  // If they named a specific Nilaya design, route directly (not generic)
+  const specific = /ador|deco dynasty|novamur|botanica|city glow|jackie/i.test(text);
+  if (specific) return false;
+  // Otherwise, any wallpaper-ish phrasing triggers the menu
+  return /wallpaper|wall paper|wall-paper|nilaya|wall covering|wallcovering|wall sticker/i.test(text);
+}
+
+// Detect that the customer wants the LUXURY / PREMIUM wallpaper range (which
+// we don't send PDFs for — we tell them to call/visit the shop)
+function isLuxuryWallpaperRequest(message) {
+  const text = (message || "").toLowerCase();
+  // Must mention wallpaper AND a luxury/premium/imported/designer keyword
+  const isWallpaper = /wallpaper|wall paper|wall-paper|nilaya|wallcovering/i.test(text);
+  if (!isWallpaper) return false;
+  return /luxury|premium|designer|imported|high end|high-end|expensive|top range|best range|exclusive/i.test(text);
+}
+
+// Detect that the customer named a SPECIFIC wallpaper design — route directly
+function detectSpecificWallpaper(message) {
+  const text = (message || "").toLowerCase();
+  if (/art ?& ?soul|art and soul/i.test(text)) return ["wallpaperEcoArtSoul"];
+  if (/iconic/i.test(text)) return ["wallpaperEcoIconic"];
+  if (/palace life|palace/i.test(text)) return ["wallpaperEcoPalaceLife"];
+  if (/serenade/i.test(text)) return ["wallpaperEcoSerenade"];
+  if (/deco dynasty|deco/i.test(text)) return ["wallpaperEcoDecoDynasty"];
+  if (/novamur|ivy/i.test(text)) return ["wallpaperMedNovamurIvy"];
+  if (/botanica/i.test(text)) return ["wallpaperMedBotanica"];
+  if (/city glow/i.test(text)) return ["wallpaperMedCityGlow"];
+  if (/jackie/i.test(text)) return ["wallpaperMedJackie"];
+  return [];
+}
+
+
 // Decide which brochure(s) the customer is asking for. Returns array of keys.
 // Specific product names route to the specific matching PDF.
 function detectBrochureRequest(message) {
   const text = (message || "").toLowerCase();
+
+  // ---- SPECIFIC WALLPAPER DESIGNS → SPECIFIC PDFs (checked first) ----
+  const specificWallpaper = detectSpecificWallpaper(text);
+  if (specificWallpaper.length > 0) return specificWallpaper;
 
   // ---- SPECIFIC PRODUCT NAMES → SPECIFIC PDFs (checked first, most precise) ----
   // Wood-specific products
@@ -1165,27 +1342,34 @@ async function processMessage(fromNumber, incomingMessage) {
   try {
     // ---- SHADE-CARD MENU: if customer was just shown the menu, handle their number reply ----
     if (isWaitingForMenuReply(fromNumber)) {
-      const numMatch = (incomingMessage || "").trim().match(/^(\d{1,2})\b/);
-      if (numMatch) {
-        const num = parseInt(numMatch[1], 10);
+      const num = parseMenuChoice(incomingMessage);
+      console.log(`📋 Menu parse for ${fromNumber}: "${incomingMessage}" → ${num}`);
+      if (num !== null) {
         const keys = brochuresForMenuNumber(num);
         if (keys.length > 0) {
           clearMenuWaiting(fromNumber);
           const isAllRequest = num === 11 || num === 12 || num === 13;
           const note = isAllRequest
-            ? `Sending you ${keys.length} PDFs 📄 — please wait a moment for all of them.`
+            ? `Sending you ${keys.length} PDFs 📄 — please wait, all of them are coming through one by one.`
             : `Sending the shade card 📄 — please wait a moment.`;
           await sendWhatsAppMessage(fromNumber, note);
+          let sent = 0;
           for (const key of keys) {
             const b = BROCHURES[key];
-            if (b) await sendWhatsAppDocument(fromNumber, b);
+            if (b) {
+              await sendWhatsAppDocument(fromNumber, b);
+              sent++;
+              // Small delay between sequential PDFs so Meta doesn't rate-limit
+              if (sent < keys.length) await new Promise(r => setTimeout(r, 800));
+            }
           }
+          console.log(`✓ Sent ${sent}/${keys.length} PDFs to ${fromNumber} for menu choice ${num}`);
           await sendWhatsAppMessage(
             fromNumber,
             "Anything else I can help with? You can visit the shop or call +91 63995 46064 to see physical shade cards. 🎨"
           );
           addToHistory(fromNumber, "user", incomingMessage);
-          addToHistory(fromNumber, "assistant", `Sent ${keys.length} PDF(s) from menu choice ${num}.`);
+          addToHistory(fromNumber, "assistant", `Sent ${sent} PDF(s) from menu choice ${num}.`);
           return;
         }
       }
@@ -1201,6 +1385,68 @@ async function processMessage(fromNumber, incomingMessage) {
       await sendWhatsAppMessage(fromNumber, SHADE_CARD_MENU);
       addToHistory(fromNumber, "user", incomingMessage);
       addToHistory(fromNumber, "assistant", "[Showed shade-card menu]");
+      return;
+    }
+
+    // ---- WALLPAPER MENU: if customer was just shown the wallpaper menu, handle their number reply ----
+    if (isWaitingForWallpaperMenuReply(fromNumber)) {
+      const num = parseMenuChoice(incomingMessage);
+      console.log(`🎨 Wallpaper menu parse for ${fromNumber}: "${incomingMessage}" → ${num}`);
+      if (num !== null) {
+        const keys = wallpaperBrochuresForMenuNumber(num);
+        if (keys.length > 0) {
+          clearMenuWaiting(fromNumber);
+          const isAllRequest = num === 6 || num === 11;
+          const note = isAllRequest
+            ? `Sending you ${keys.length} wallpaper PDFs 📄 — please wait, all of them are coming through one by one.`
+            : `Sending the wallpaper catalogue 📄 — please wait a moment.`;
+          await sendWhatsAppMessage(fromNumber, note);
+          let sent = 0;
+          for (const key of keys) {
+            const b = BROCHURES[key];
+            if (b) {
+              await sendWhatsAppDocument(fromNumber, b);
+              sent++;
+              if (sent < keys.length) await new Promise(r => setTimeout(r, 800));
+            }
+          }
+          console.log(`✓ Sent ${sent}/${keys.length} wallpaper PDFs to ${fromNumber} for menu choice ${num}`);
+          await sendWhatsAppMessage(
+            fromNumber,
+            "For our luxury or imported designer Nilaya range, please call *+91 63995 46064* or visit Chandra Color Shoppee — those are best seen in person. 🎨"
+          );
+          addToHistory(fromNumber, "user", incomingMessage);
+          addToHistory(fromNumber, "assistant", `Sent ${sent} wallpaper PDF(s) from menu choice ${num}.`);
+          return;
+        }
+      }
+      clearMenuWaiting(fromNumber);
+    }
+
+    // ---- LUXURY WALLPAPER: customer asked for luxury/premium/designer/imported wallpaper → redirect to shop ----
+    if (isLuxuryWallpaperRequest(incomingMessage)) {
+      console.log(`✨ Luxury wallpaper request from ${fromNumber} — redirecting to shop`);
+      await sendWhatsAppMessage(
+        fromNumber,
+        "For our *luxury, premium, designer, and imported Nilaya wallpaper* collections, " +
+        "the catalogues are quite extensive and best seen in person with real samples.\n\n" +
+        "Please call us at *+91 63995 46064* or visit Chandra Color Shoppee at " +
+        "Paschim Puri Crossing, Shastripuram, Agra — and we'll show you the full range.\n\n" +
+        "If you'd like, I can send you our Economy or Medium range Nilaya catalogues " +
+        "on WhatsApp right now. Just say *wallpaper menu*. 🎨"
+      );
+      addToHistory(fromNumber, "user", incomingMessage);
+      addToHistory(fromNumber, "assistant", "[Redirected luxury wallpaper request to shop]");
+      return;
+    }
+
+    // ---- GENERIC WALLPAPER REQUEST: show the wallpaper menu ----
+    if (isGenericWallpaperRequest(incomingMessage)) {
+      console.log(`📋 Showing wallpaper menu to ${fromNumber}`);
+      markWallpaperMenuShown(fromNumber);
+      await sendWhatsAppMessage(fromNumber, WALLPAPER_MENU);
+      addToHistory(fromNumber, "user", incomingMessage);
+      addToHistory(fromNumber, "assistant", "[Showed wallpaper menu]");
       return;
     }
 
@@ -1253,7 +1499,8 @@ async function processMessage(fromNumber, incomingMessage) {
         requirement !== "General enquiry — follow up needed";
 
       if (haveRealRequirement || userMsgCount >= 3) {
-        await saveLeadToSheets(phone, name, customerType, requirement);
+        const source = detectSource(history);
+        await saveLeadToSheets(phone, name, customerType, requirement, source);
         savedLeads.add(phone); // don't save this number again this run
       }
     }
