@@ -214,26 +214,13 @@ function detectRequirement(conversationHistory) {
     .map((m) => m.content);
   const text = userMsgs.join(" ").toLowerCase();
 
-  // Menu number mapping (customer picked from the service menu)
-  const menuMap = {
-    "1": "Wall paint & colour selection",
-    "2": "Colour / shade suggestions",
-    "3": "Waterproofing (leakage / damp)",
-    "4": "Wall textures",
-    "5": "Wallpapers",
-    "6": "Wood polish & coatings",
-    "7": "Full house painting service",
-    "8": "Price / quotation enquiry",
-    "9": "Shop visit / location enquiry",
-  };
-  // Check if any user message is just a single menu digit
-  const menuPicks = [];
-  for (const msg of userMsgs) {
-    const trimmed = msg.trim();
-    if (/^[1-9]$/.test(trimmed) && menuMap[trimmed]) {
-      menuPicks.push(menuMap[trimmed]);
-    }
-  }
+  // NOTE: We used to interpret bare single digits ("3", "4") as picks from
+  // the old service menu. But the bot now has multiple newer menus that use
+  // digits too (shade-card 1-13, wallpaper 1-11). A bare "3" in conversation
+  // could mean Royale shade card, Ador Palace Life wallpaper, etc. — NOT
+  // "waterproofing" as the old code assumed. So we rely purely on text
+  // content from here on. If the customer wants a category, they'll say it
+  // in words ("interior paint", "wall textures", "leakage", etc.).
 
   // Typo-tolerant "paint" matcher
   const paintWord = /p[ia]{1,3}n+t/i;
@@ -258,12 +245,9 @@ function detectRequirement(conversationHistory) {
   if (/kids|children|nursery/i.test(text)) rooms.push("kids room");
   if (/office/i.test(text)) rooms.push("office");
 
-  // Combine menu picks + detected interests
-  const allInterests = [...new Set([...menuPicks, ...interests])];
-
   let requirement = "";
-  if (allInterests.length > 0) {
-    requirement = allInterests.join(", ");
+  if (interests.length > 0) {
+    requirement = interests.join(", ");
     if (rooms.length > 0) requirement += " (" + rooms.join(", ") + ")";
   } else if (rooms.length > 0) {
     requirement = "Painting — " + rooms.join(", ");
